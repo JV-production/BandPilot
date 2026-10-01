@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { updateEvent } from "@/app/actions/events";
 import { requireUser } from "@/lib/auth";
-import { canManageBand } from "@/lib/permissions";
+import { canManageBand, isAdmin } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
 import { EventForm } from "@/components/EventForm";
 import { PageHeader } from "@/components/ui";
@@ -16,7 +16,7 @@ export default async function EditEventPage({ params }: { params: Promise<{ id: 
   return (
     <div className="mx-auto max-w-2xl">
       <PageHeader title="Upravit akci" subtitle={event.band.name} back={{ href: `/events/${id}`, label: event.title }} />
-      <EventForm action={updateEvent.bind(null, id)} event={event} submitLabel="Uložit změny" />
+      <EventForm action={updateEvent.bind(null, id)} event={event} submitLabel="Uložit změny" showFee={isAdmin(user)} />
     </div>
   );
 }

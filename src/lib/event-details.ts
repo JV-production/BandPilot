@@ -107,10 +107,9 @@ export function calendarDescription(event: FullEvent, userId: string | null, app
     lines.push("");
   }
 
-  if (event.contactName || event.contactPhone || event.fee || event.dressCode) {
+  if (event.contactName || event.contactPhone || event.dressCode) {
     lines.push("ℹ️ DALŠÍ INFO");
     add("Kontakt na místě", [event.contactName, event.contactPhone].filter(Boolean).join(", "));
-    add("Honorář", event.fee);
     add("Dress code", event.dressCode);
     lines.push("");
   }

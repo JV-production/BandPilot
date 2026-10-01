@@ -24,7 +24,7 @@ function makeEvent(overrides: Partial<FullEvent> = {}): FullEvent {
     endAt: null,
     contactName: null,
     contactPhone: null,
-    fee: null,
+    fee: "15 000 Kč",
     dressCode: null,
     setlist: null,
     notes: null,
@@ -99,6 +99,8 @@ describe("calendar content", () => {
     expect(text).toContain("Auto: Transit – řidič Petr");
     expect(text).toContain("bicí: Martin");
     expect(text).toContain("https://app.cz/events/e1");
+    expect(text).not.toContain("15 000");
+    expect(text).not.toContain("Honorář");
   });
 
   it("marks cancelled events in the title", () => {
@@ -119,5 +121,6 @@ describe("ics", () => {
     expect(ics).toContain("DTSTART:20260710T103000Z");
     expect(ics).toContain("LOCATION:Amfiteátr\\, Lipnice 1");
     expect(ics.trim().endsWith("END:VCALENDAR")).toBe(true);
+    expect(ics).not.toContain("15 000");
   });
 });

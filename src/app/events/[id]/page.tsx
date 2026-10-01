@@ -5,7 +5,7 @@ import { addLineupSlot, assignLineupSlot, deleteEvent, removeLineupSlot, setAtte
 import { requireUser } from "@/lib/auth";
 import { eventFullInclude, findCarForUser } from "@/lib/event-details";
 import { BAND_ROLE } from "@/lib/labels";
-import { assertCanViewBand, canManageBand } from "@/lib/permissions";
+import { assertCanViewBand, canManageBand, isAdmin } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
 import { fmtDate, fmtTime, toLocalInput } from "@/lib/time";
 import { NewPollForm } from "@/components/NewPollForm";
@@ -132,7 +132,12 @@ export default async function EventPage({ params }: { params: Promise<{ id: stri
                 <dd className="inline"><a className="text-brand-600" href={`tel:${event.contactPhone}`}>{event.contactPhone}</a></dd>
               </div>
             )}
-            {event.fee && <div><dt className="inline text-slate-500">Honorář: </dt><dd className="inline">{event.fee}</dd></div>}
+            {isAdmin(user) && event.fee && (
+              <div>
+                <dt className="inline text-slate-500">Honorář 🔒: </dt>
+                <dd className="inline">{event.fee}</dd>
+              </div>
+            )}
             {event.dressCode && <div><dt className="inline text-slate-500">Dress code: </dt><dd className="inline">{event.dressCode}</dd></div>}
           </dl>
         </section>

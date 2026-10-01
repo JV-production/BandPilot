@@ -39,7 +39,18 @@ function Field({
   );
 }
 
-export function EventForm({ action, event, submitLabel }: { action: (fd: FormData) => Promise<void>; event?: Event; submitLabel: string }) {
+export function EventForm({
+  action,
+  event,
+  submitLabel,
+  showFee,
+}: {
+  action: (fd: FormData) => Promise<void>;
+  event?: Event;
+  submitLabel: string;
+  /** Honorář vidí a upravuje jen organizátor. */
+  showFee: boolean;
+}) {
   return (
     <form action={action} className="space-y-5">
       <section className="card space-y-4">
@@ -80,7 +91,9 @@ export function EventForm({ action, event, submitLabel }: { action: (fd: FormDat
         <h2 className="section-title sm:col-span-2">Další informace</h2>
         <Field label="Kontaktní osoba" name="contactName" defaultValue={event?.contactName} />
         <Field label="Telefon na kontakt" name="contactPhone" type="tel" defaultValue={event?.contactPhone} />
-        <Field label="Honorář" name="fee" defaultValue={event?.fee} />
+        {showFee && (
+          <Field label="Honorář 🔒" name="fee" defaultValue={event?.fee} hint="Vidí jen organizátor – členům ani do kalendáře se nezobrazuje." />
+        )}
         <Field label="Dress code" name="dressCode" defaultValue={event?.dressCode} />
         <div className="sm:col-span-2">
           <label className="label" htmlFor="setlist">Setlist</label>

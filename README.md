@@ -14,7 +14,8 @@ hlasování a automatický zápis do Google Kalendáře. Běží v prohlížeči
 | **Alternace** (`SUBSTITUTE`) | totéž co člen, navíc se může přihlásit na uvolněnou pozici („Zahraju já“) |
 
 - **Koncerty** – název, stav (v jednání / potvrzeno / zrušeno), klub a adresa (s odkazem na navigaci), sraz,
-  časy odjezdu, get-inu, zvukovky, začátku a konce, kontakt, honorář, dress code, setlist, poznámky.
+  časy odjezdu, get-inu, zvukovky, začátku a konce, kontakt, dress code, setlist, poznámky. **Honorář vidí jen
+  organizátor** – členům, vedoucím ani do kalendářů se nezobrazuje.
 - **Kdo hraje** – sestava se při vytvoření akce předvyplní stálými členy a jejich nástroji. Když někdo odpoví
   „nemůžu“, pozice se zvýrazní a vedoucí dosadí alternaci (nebo se alternace přihlásí sama).
 - **Doprava** – kdokoli nabídne auto (počet míst, čas a místo odjezdu), ostatní se do něj zapíší. Aplikace ukazuje,

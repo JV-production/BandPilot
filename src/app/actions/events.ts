@@ -12,7 +12,7 @@ import { parseLocalDateTime } from "@/lib/time";
 
 const STATUSES = ["PLANNED", "CONFIRMED", "CANCELLED"] as const;
 
-function eventData(formData: FormData) {
+function eventData(formData: FormData, canSetFee: boolean) {
   const startAt = parseLocalDateTime(formData.get("startAt"));
   if (!startAt) throw new Error("Vyplňte datum a čas začátku.");
   return {
@@ -28,7 +28,8 @@ function eventData(formData: FormData) {
     endAt: parseLocalDateTime(formData.get("endAt")),
     contactName: str(formData, "contactName"),
     contactPhone: str(formData, "contactPhone"),
-    fee: str(formData, "fee"),
+    // Honorář smí nastavit jen organizátor; jinak zůstává beze změny.
+    ...(canSetFee ? { fee: str(formData, "fee") } : {}),
     dressCode: str(formData, "dressCode"),
     setlist: str(formData, "setlist"),
     notes: str(formData, "notes"),
@@ -52,7 +53,7 @@ async function loadEventForUser(eventId: string) {
 export async function createEvent(bandId: string, formData: FormData) {
   const user = await requireUser();
   await assertCanManageBand(user, bandId);
-  const data = eventData(formData);
+  const data = eventData(formData, isAdmin(user));
 
   // Výchozí sestava = stálí členové a vedoucí se svými nástroji.
   const core = await prisma.bandMembership.findMany({
@@ -77,9 +78,9 @@ export async function createEvent(bandId: string, formData: FormData) {
 }
 
 export async function updateEvent(eventId: string, formData: FormData) {
-  const { manager } = await loadEventForUser(eventId);
+  const { manager, user } = await loadEventForUser(eventId);
   if (!manager) throw new Error("Akci může upravit jen organizátor nebo vedoucí kapely.");
-  await prisma.event.update({ where: { id: eventId }, data: eventData(formData) });
+  await prisma.event.update({ where: { id: eventId }, data: eventData(formData, isAdmin(user)) });
   scheduleSync(eventId);
   revalidatePath(`/events/${eventId}`);
   redirect(`/events/${eventId}`);
