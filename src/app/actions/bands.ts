@@ -1,0 +1,95 @@
+"use server";
+
+import { revalidatePath } from "next/cache";
+import { after } from "next/server";
+import { redirect } from "next/navigation";
+import { requireAdmin } from "@/lib/auth";
+import { oneOf, requiredStr, str } from "@/lib/form";
+import { syncUpcomingForUser } from "@/lib/google-calendar";
+import { prisma } from "@/lib/prisma";
+
+const BAND_ROLES = ["LEADER", "MEMBER", "SUBSTITUTE"] as const;
+
+export async function createBand(formData: FormData) {
+  await requireAdmin();
+  const band = await prisma.band.create({
+    data: {
+      name: requiredStr(formData, "name", "Název"),
+      description: str(formData, "description"),
+      color: str(formData, "color") ?? "#6366f1",
+    },
+  });
+  revalidatePath("/bands");
+  redirect(`/bands/${band.id}`);
+}
+
+export async function updateBand(bandId: string, formData: FormData) {
+  await requireAdmin();
+  await prisma.band.update({
+    where: { id: bandId },
+    data: {
+      name: requiredStr(formData, "name", "Název"),
+      description: str(formData, "description"),
+      color: str(formData, "color") ?? "#6366f1",
+    },
+  });
+  revalidatePath(`/bands/${bandId}`);
+}
+
+export async function deleteBand(bandId: string) {
+  await requireAdmin();
+  await prisma.band.delete({ where: { id: bandId } });
+  revalidatePath("/bands");
+  redirect("/bands");
+}
+
+/** Přidá uživatele do kapely podle e-mailu. Pokud účet neexistuje, založí ho –
+ *  po prvním přihlášení přes Google se automaticky propojí. */
+export async function addMember(bandId: string, formData: FormData) {
+  await requireAdmin();
+  const email = requiredStr(formData, "email", "E-mail").toLowerCase();
+  const name = str(formData, "name");
+  const user = await prisma.user.upsert({
+    where: { email },
+    update: name ? { name } : {},
+    create: { email, name },
+  });
+  await prisma.bandMembership.upsert({
+    where: { bandId_userId: { bandId, userId: user.id } },
+    update: {
+      role: oneOf(str(formData, "role"), BAND_ROLES, "MEMBER"),
+      instrument: str(formData, "instrument"),
+    },
+    create: {
+      bandId,
+      userId: user.id,
+      role: oneOf(str(formData, "role"), BAND_ROLES, "MEMBER"),
+      instrument: str(formData, "instrument"),
+    },
+  });
+  after(() => syncUpcomingForUser(user.id));
+  revalidatePath(`/bands/${bandId}`);
+}
+
+export async function updateMember(membershipId: string, formData: FormData) {
+  await requireAdmin();
+  const m = await prisma.bandMembership.update({
+    where: { id: membershipId },
+    data: {
+      role: oneOf(str(formData, "role"), BAND_ROLES, "MEMBER"),
+      instrument: str(formData, "instrument"),
+    },
+  });
+  revalidatePath(`/bands/${m.bandId}`);
+}
+
+export async function removeMember(membershipId: string) {
+  await requireAdmin();
+  const m = await prisma.bandMembership.delete({ where: { id: membershipId } });
+  // Odebereme ho i z budoucích sestav a aut v této kapele.
+  const upcoming = { bandId: m.bandId, startAt: { gte: new Date() } };
+  await prisma.lineupSlot.updateMany({ where: { userId: m.userId, event: upcoming }, data: { userId: null } });
+  await prisma.carSeat.deleteMany({ where: { userId: m.userId, car: { event: upcoming } } });
+  after(() => syncUpcomingForUser(m.userId));
+  revalidatePath(`/bands/${m.bandId}`);
+}

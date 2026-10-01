@@ -1,0 +1,261 @@
+// BandPilot – datový model
+// Pro produkci lze provider změnit na "postgresql" (schéma nepoužívá nic specifického pro SQLite).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ---------- Uživatelé a přihlášení (NextAuth) ----------
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  emailVerified DateTime?
+  image         String?
+  phone         String?
+  // ADMIN = organizátor (spravuje kapely, akce a přístupy), USER = běžný člen
+  role          String    @default("USER")
+  // Tajný token pro odběr iCal kalendáře (alternativa k přímé synchronizaci)
+  calendarToken String    @unique @default(cuid())
+  // Zda zapisovat akce přímo do Google Kalendáře uživatele
+  calendarSync  Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+
+  accounts      Account[]
+  sessions      Session[]
+  memberships   BandMembership[]
+  attendances   Attendance[]
+  lineupSlots   LineupSlot[]
+  drivenCars    Car[]            @relation("CarDriver")
+  carSeats      CarSeat[]
+  pollVotes     PollVote[]
+  createdPolls  Poll[]
+  calendarLinks CalendarLink[]
+  createdEvents Event[]          @relation("EventCreator")
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// ---------- Kapely ----------
+
+model Band {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  color       String   @default("#6366f1")
+  createdAt   DateTime @default(now())
+
+  memberships BandMembership[]
+  events      Event[]
+  polls       Poll[]
+}
+
+model BandMembership {
+  id         String   @id @default(cuid())
+  bandId     String
+  userId     String
+  // LEADER = vedoucí kapely (může upravovat akce), MEMBER = stálý člen, SUBSTITUTE = alternace / záskok
+  role       String   @default("MEMBER")
+  // Nástroj / pozice, např. "bicí", "kytara", "zpěv"
+  instrument String?
+  createdAt  DateTime @default(now())
+
+  band Band @relation(fields: [bandId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([bandId, userId])
+}
+
+// ---------- Akce / koncerty ----------
+
+model Event {
+  id              String    @id @default(cuid())
+  bandId          String
+  title           String
+  // PLANNED = v jednání, CONFIRMED = potvrzeno, CANCELLED = zrušeno
+  status          String    @default("PLANNED")
+
+  venueName       String?
+  venueAddress    String?
+  // Odkud se odjíždí (zkušebna, sraz…)
+  meetingPoint    String?
+
+  departureAt     DateTime?
+  getInAt         DateTime?
+  soundcheckAt    DateTime?
+  startAt         DateTime
+  endAt           DateTime?
+
+  contactName     String?
+  contactPhone    String?
+  fee             String?
+  dressCode       String?
+  setlist         String?
+  notes           String?
+
+  createdById     String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  band          Band           @relation(fields: [bandId], references: [id], onDelete: Cascade)
+  createdBy     User?          @relation("EventCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  attendances   Attendance[]
+  lineup        LineupSlot[]
+  cars          Car[]
+  polls         Poll[]
+  calendarLinks CalendarLink[]
+
+  @@index([bandId, startAt])
+}
+
+// Odpověď člena, zda může hrát
+model Attendance {
+  id        String   @id @default(cuid())
+  eventId   String
+  userId    String
+  // YES / NO / MAYBE
+  status    String
+  note      String?
+  updatedAt DateTime @updatedAt
+
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([eventId, userId])
+}
+
+// Kdo hraje na jaké pozici (stálý člen nebo alternace)
+model LineupSlot {
+  id         String  @id @default(cuid())
+  eventId    String
+  instrument String
+  userId     String?
+  sortOrder  Int     @default(0)
+
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  user  User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+}
+
+// ---------- Doprava ----------
+
+model Car {
+  id          String    @id @default(cuid())
+  eventId     String
+  driverId    String
+  label       String?
+  seats       Int       @default(4)
+  departureAt DateTime?
+  departFrom  String?
+  note        String?
+
+  event  Event     @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  driver User      @relation("CarDriver", fields: [driverId], references: [id], onDelete: Cascade)
+  seatsTaken CarSeat[]
+}
+
+model CarSeat {
+  id      String @id @default(cuid())
+  carId   String
+  userId  String
+  // Duplikováno kvůli unikátnosti: jeden člověk = jedno auto na akci
+  eventId String
+
+  car  Car  @relation(fields: [carId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([eventId, userId])
+}
+
+// ---------- Hlasování ----------
+
+model Poll {
+  id          String   @id @default(cuid())
+  bandId      String
+  eventId     String?
+  question    String
+  multiple    Boolean  @default(false)
+  closed      Boolean  @default(false)
+  createdById String
+  createdAt   DateTime @default(now())
+
+  band      Band         @relation(fields: [bandId], references: [id], onDelete: Cascade)
+  event     Event?       @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  createdBy User         @relation(fields: [createdById], references: [id], onDelete: Cascade)
+  options   PollOption[]
+}
+
+model PollOption {
+  id        String     @id @default(cuid())
+  pollId    String
+  text      String
+  sortOrder Int        @default(0)
+
+  poll  Poll       @relation(fields: [pollId], references: [id], onDelete: Cascade)
+  votes PollVote[]
+}
+
+model PollVote {
+  id       String @id @default(cuid())
+  optionId String
+  userId   String
+
+  option PollOption @relation(fields: [optionId], references: [id], onDelete: Cascade)
+  user   User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([optionId, userId])
+}
+
+// ---------- Google Kalendář ----------
+
+// Vazba akce na událost v Google Kalendáři konkrétního uživatele
+model CalendarLink {
+  id            String   @id @default(cuid())
+  eventId       String
+  userId        String
+  googleEventId String
+  syncedAt      DateTime @default(now())
+
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([eventId, userId])
+}
