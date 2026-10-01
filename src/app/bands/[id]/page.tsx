@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { addMember, deleteBand, removeMember, updateBand, updateMember } from "@/app/actions/bands";
 import { requireUser } from "@/lib/auth";
+import { formatCzk } from "@/lib/earnings";
 import { BAND_ROLE } from "@/lib/labels";
 import { assertCanViewBand, canManageBand, getMembership, isAdmin } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
@@ -90,6 +91,7 @@ export default async function BandPage({ params }: { params: Promise<{ id: strin
                       </>
                     )}
                     {admin && ` · ${m.user.email}`}
+                    {(admin || m.userId === user.id) && m.defaultPay != null && ` · 💰 ${formatCzk(m.defaultPay)}/akce 🔒`}
                   </div>
                 </div>
               </div>
@@ -105,6 +107,10 @@ export default async function BandPage({ params }: { params: Promise<{ id: strin
                       <div className="min-w-[140px] flex-1">
                         <label className="label">Nástroj</label>
                         <input name="instrument" defaultValue={m.instrument ?? ""} className="input" />
+                      </div>
+                      <div className="min-w-[120px] flex-1">
+                        <label className="label">Honorář/akce 🔒</label>
+                        <input name="defaultPay" inputMode="numeric" defaultValue={m.defaultPay ?? ""} className="input" />
                       </div>
                       <SubmitButton className="btn-secondary">Uložit</SubmitButton>
                     </form>
@@ -138,6 +144,11 @@ export default async function BandPage({ params }: { params: Promise<{ id: strin
             <div>
               <label className="label">Nástroj / pozice</label>
               <input name="instrument" className="input" placeholder="bicí, kytara, zpěv…" />
+            </div>
+            <div>
+              <label className="label">Výchozí honorář za akci (Kč) 🔒</label>
+              <input name="defaultPay" inputMode="numeric" className="input" placeholder="např. 2500" />
+              <p className="mt-1 text-xs text-slate-500">Vidí jen organizátor a tento člen.</p>
             </div>
             <div className="sm:col-span-2">
               <SubmitButton>Přidat do kapely</SubmitButton>

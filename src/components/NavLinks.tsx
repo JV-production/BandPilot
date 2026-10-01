@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 const LINKS = [
   { href: "/", label: "Koncerty", icon: "🗓️", admin: false },
   { href: "/bands", label: "Kapely", icon: "🎶", admin: false },
+  { href: "/earnings", label: "Honoráře", icon: "💰", admin: false },
   { href: "/admin/users", label: "Uživatelé", icon: "👥", admin: true },
   { href: "/settings", label: "Nastavení", icon: "⚙️", admin: false },
 ];
@@ -31,7 +32,7 @@ export function NavLinks({ isAdmin, variant }: { isAdmin: boolean; variant: "top
           <Link
             key={link.href}
             href={link.href}
-            className={`flex min-w-[64px] flex-col items-center gap-0.5 px-2 py-2 text-[11px] font-medium ${active ? "text-brand-700" : "text-slate-500"}`}
+            className={`flex min-w-[60px] flex-col items-center gap-0.5 px-2 py-2 text-[11px] font-medium ${active ? "text-brand-700" : "text-slate-500"}`}
           >
             <span className="text-xl leading-none" aria-hidden>
               {link.icon}

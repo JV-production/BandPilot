@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { addCar, deleteCar, joinCar, leaveCar } from "@/app/actions/cars";
-import { addLineupSlot, assignLineupSlot, deleteEvent, removeLineupSlot, setAttendance } from "@/app/actions/events";
+import { addLineupSlot, assignLineupSlot, deleteEvent, removeLineupSlot, setAttendance, setSlotPay } from "@/app/actions/events";
+import { formatCzk } from "@/lib/earnings";
 import { requireUser } from "@/lib/auth";
 import { eventFullInclude, findCarForUser } from "@/lib/event-details";
 import { BAND_ROLE } from "@/lib/labels";
@@ -28,6 +29,11 @@ export default async function EventPage({ params }: { params: Promise<{ id: stri
   const myAnswer = answers.get(user.id);
   const myCar = findCarForUser(event, user.id);
   const iDrive = event.cars.some((c) => c.driverId === user.id);
+  const admin = isAdmin(user);
+  // Honorář: každý vidí jen svůj (pozice, které sám hraje), organizátor vidí vše.
+  const mySlots = event.lineup.filter((s) => s.userId === user.id);
+  const myPay = mySlots.some((s) => s.pay != null) ? mySlots.reduce((sum, s) => sum + (s.pay ?? 0), 0) : null;
+  const myPaid = mySlots.length > 0 && mySlots.every((s) => s.paidAt);
 
   const going = members.filter((m) => {
     const s = answers.get(m.userId)?.status;
@@ -88,6 +94,18 @@ export default async function EventPage({ params }: { params: Promise<{ id: stri
         </section>
       )}
 
+      {mySlots.length > 0 && event.status !== "CANCELLED" && (
+        <section className="card flex items-center justify-between gap-3">
+          <div>
+            <div className="text-sm text-slate-500">💰 Tvůj honorář za tuto akci 🔒</div>
+            <div className="text-xl font-extrabold">{formatCzk(myPay)}</div>
+          </div>
+          <span className={`badge ${myPaid ? "bg-emerald-100 text-emerald-800" : "bg-slate-100 text-slate-600"}`}>
+            {myPaid ? "Vyplaceno" : "Nevyplaceno"}
+          </span>
+        </section>
+      )}
+
       <div className="grid gap-6 md:grid-cols-2">
         {/* Harmonogram */}
         <section className="card">
@@ -132,9 +150,9 @@ export default async function EventPage({ params }: { params: Promise<{ id: stri
                 <dd className="inline"><a className="text-brand-600" href={`tel:${event.contactPhone}`}>{event.contactPhone}</a></dd>
               </div>
             )}
-            {isAdmin(user) && event.fee && (
+            {admin && event.fee && (
               <div>
-                <dt className="inline text-slate-500">Honorář 🔒: </dt>
+                <dt className="inline text-slate-500">Honorář za akci celkem 🔒: </dt>
                 <dd className="inline">{event.fee}</dd>
               </div>
             )}
@@ -197,6 +215,23 @@ export default async function EventPage({ params }: { params: Promise<{ id: stri
                     )}
                   </div>
                 </div>
+                {admin && (
+                  <form action={setSlotPay.bind(null, slot.id)} className="mt-2 flex flex-wrap items-center gap-2 rounded-xl bg-amber-50/70 p-2">
+                    <span className="text-xs font-semibold text-amber-800">💰 🔒</span>
+                    <input
+                      name="pay"
+                      inputMode="numeric"
+                      defaultValue={slot.pay ?? ""}
+                      placeholder="Honorář Kč"
+                      className="input min-h-[36px] w-28 flex-none py-1"
+                    />
+                    <label className="flex items-center gap-1 text-xs">
+                      <input type="checkbox" name="paid" defaultChecked={!!slot.paidAt} className="h-4 w-4 accent-brand-600" />
+                      vyplaceno
+                    </label>
+                    <SubmitButton className="btn-secondary btn-sm">Uložit</SubmitButton>
+                  </form>
+                )}
                 {manager && (
                   <div className="mt-2 flex flex-wrap gap-2">
                     <form action={assignLineupSlot.bind(null, slot.id)} className="flex flex-1 gap-2">
@@ -227,6 +262,7 @@ export default async function EventPage({ params }: { params: Promise<{ id: stri
         {manager && (
           <form action={addLineupSlot.bind(null, id)} className="mt-2 flex gap-2">
             <input name="instrument" required placeholder="Nová pozice (např. saxofon)" className="input flex-1" />
+            {admin && <input name="pay" inputMode="numeric" placeholder="Kč 🔒" className="input w-24 flex-none" />}
             <SubmitButton className="btn-secondary">Přidat</SubmitButton>
           </form>
         )}

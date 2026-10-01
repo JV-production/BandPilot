@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { after } from "next/server";
 import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/auth";
+import { parsePay } from "@/lib/earnings";
 import { oneOf, requiredStr, str } from "@/lib/form";
 import { removeEventFromCalendars, syncEventToCalendars } from "@/lib/google-calendar";
 import { assertCanManageBand, canManageBand, getMembership, isAdmin } from "@/lib/permissions";
@@ -68,7 +69,12 @@ export async function createEvent(bandId: string, formData: FormData) {
       bandId,
       createdById: user.id,
       lineup: {
-        create: core.map((m, i) => ({ instrument: m.instrument || "hudebník", userId: m.userId, sortOrder: i })),
+        create: core.map((m, i) => ({
+          instrument: m.instrument || "hudebník",
+          userId: m.userId,
+          sortOrder: i,
+          pay: m.defaultPay,
+        })),
       },
     },
   });
@@ -140,7 +146,17 @@ export async function assignLineupSlot(slotId: string, formData: FormData) {
   }
 
   const previous = slot.userId;
-  await prisma.lineupSlot.update({ where: { id: slotId }, data: { userId: target } });
+  let pay = slot.pay;
+  if (target !== previous && pay == null && target) {
+    // Pozice bez určeného honoráře převezme výchozí sazbu nového hráče.
+    pay = (await prisma.bandMembership.findUnique({ where: { bandId_userId: { bandId: event.bandId, userId: target } } }))
+      ?.defaultPay ?? null;
+  }
+  await prisma.lineupSlot.update({
+    where: { id: slotId },
+    // Při změně hráče se vynuluje příznak vyplacení – patřil předchozímu hráči.
+    data: { userId: target, pay, ...(target !== previous ? { paidAt: null } : {}) },
+  });
   if (target && target !== previous) {
     // Nový hráč v sestavě automaticky potvrzuje účast.
     await prisma.attendance.upsert({
@@ -154,11 +170,12 @@ export async function assignLineupSlot(slotId: string, formData: FormData) {
 }
 
 export async function addLineupSlot(eventId: string, formData: FormData) {
-  const { manager } = await loadEventForUser(eventId);
+  const { manager, user } = await loadEventForUser(eventId);
   if (!manager) throw new Error("Sestavu může upravit jen vedoucí kapely.");
+  const pay = isAdmin(user) ? parsePay(formData.get("pay")) : null;
   const count = await prisma.lineupSlot.count({ where: { eventId } });
   await prisma.lineupSlot.create({
-    data: { eventId, instrument: requiredStr(formData, "instrument", "Pozice"), sortOrder: count },
+    data: { eventId, instrument: requiredStr(formData, "instrument", "Pozice"), sortOrder: count, pay },
   });
   scheduleSync(eventId);
   revalidatePath(`/events/${eventId}`);
@@ -172,4 +189,22 @@ export async function removeLineupSlot(slotId: string) {
   await prisma.lineupSlot.delete({ where: { id: slotId } });
   scheduleSync(slot.eventId);
   revalidatePath(`/events/${slot.eventId}`);
+}
+
+/** Honorář za pozici a jeho vyplacení – jen organizátor. */
+export async function setSlotPay(slotId: string, formData: FormData) {
+  const user = await requireUser();
+  if (!isAdmin(user)) throw new Error("Honoráře může upravovat jen organizátor.");
+  const slot = await prisma.lineupSlot.findUnique({ where: { id: slotId } });
+  if (!slot) throw new Error("Pozice neexistuje.");
+  const paid = formData.get("paid") === "on";
+  await prisma.lineupSlot.update({
+    where: { id: slotId },
+    data: {
+      pay: parsePay(formData.get("pay")),
+      paidAt: paid ? (slot.paidAt ?? new Date()) : null,
+    },
+  });
+  revalidatePath(`/events/${slot.eventId}`);
+  revalidatePath("/earnings");
 }

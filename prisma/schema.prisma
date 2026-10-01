@@ -97,6 +97,8 @@ model BandMembership {
   role       String   @default("MEMBER")
   // Nástroj / pozice, např. "bicí", "kytara", "zpěv"
   instrument String?
+  // Výchozí honorář za jednu akci (Kč) – vidí jen organizátor a člen sám
+  defaultPay Int?
   createdAt  DateTime @default(now())
 
   band Band @relation(fields: [bandId], references: [id], onDelete: Cascade)
@@ -170,6 +172,10 @@ model LineupSlot {
   instrument String
   userId     String?
   sortOrder  Int     @default(0)
+  // Honorář za tuto pozici na této akci (Kč) – vidí jen organizátor a hráč, který pozici obsadil
+  pay        Int?
+  // Kdy byl honorář hráči vyplacen
+  paidAt     DateTime?
 
   event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
   user  User? @relation(fields: [userId], references: [id], onDelete: SetNull)

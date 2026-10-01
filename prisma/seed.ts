@@ -41,11 +41,11 @@ async function main() {
       description: "Rocková kapela – kluby a festivaly",
       memberships: {
         create: [
-          { userId: petr.id, role: "LEADER", instrument: "kytara" },
-          { userId: jana.id, role: "MEMBER", instrument: "zpěv" },
-          { userId: tomas.id, role: "MEMBER", instrument: "bicí" },
-          { userId: eva.id, role: "MEMBER", instrument: "baskytara" },
-          { userId: martin.id, role: "SUBSTITUTE", instrument: "bicí" },
+          { userId: petr.id, role: "LEADER", instrument: "kytara", defaultPay: 3000 },
+          { userId: jana.id, role: "MEMBER", instrument: "zpěv", defaultPay: 2500 },
+          { userId: tomas.id, role: "MEMBER", instrument: "bicí", defaultPay: 2500 },
+          { userId: eva.id, role: "MEMBER", instrument: "baskytara", defaultPay: 2500 },
+          { userId: martin.id, role: "SUBSTITUTE", instrument: "bicí", defaultPay: 2000 },
         ],
       },
     },
@@ -64,10 +64,10 @@ async function main() {
   });
 
   const core = [
-    { instrument: "kytara", userId: petr.id },
-    { instrument: "zpěv", userId: jana.id },
-    { instrument: "bicí", userId: tomas.id },
-    { instrument: "baskytara", userId: eva.id },
+    { instrument: "kytara", userId: petr.id, pay: 3000 },
+    { instrument: "zpěv", userId: jana.id, pay: 2500 },
+    { instrument: "bicí", userId: tomas.id, pay: 2500 },
+    { instrument: "baskytara", userId: eva.id, pay: 2500 },
   ];
 
   const festival = await prisma.event.create({
@@ -116,6 +116,22 @@ async function main() {
       startAt: inDays(24, "21:00"),
       createdById: admin.id,
       lineup: { create: core.map((c, i) => ({ ...c, sortOrder: i })) },
+    },
+  });
+
+  await prisma.event.create({
+    data: {
+      bandId: rock.id,
+      title: "Zářijový klub",
+      status: "CONFIRMED",
+      venueName: "Lucerna Music Bar",
+      venueAddress: "Vodičkova 36, Praha 1",
+      startAt: inDays(-14, "21:00"),
+      fee: "12 000 Kč",
+      createdById: admin.id,
+      lineup: {
+        create: core.map((c, i) => ({ ...c, sortOrder: i, paidAt: i < 2 ? new Date() : null })),
+      },
     },
   });
 

@@ -20,6 +20,11 @@ hlasování a automatický zápis do Google Kalendáře. Běží v prohlížeči
   „nemůžu“, pozice se zvýrazní a vedoucí dosadí alternaci (nebo se alternace přihlásí sama).
 - **Doprava** – kdokoli nabídne auto (počet míst, čas a místo odjezdu), ostatní se do něj zapíší. Aplikace ukazuje,
   kdo ještě nemá odvoz.
+- **Honoráře** 🔒 – organizátor nastaví každému členovi výchozí sazbu za akci a u každé pozice v sestavě může
+  částku upravit a označit jako vyplacenou. Honorář patří pozici, takže při záskoku ho dostane ten, kdo opravdu hraje.
+  **Každý člen vidí jen svůj honorář** (u akce a na stránce *Honoráře*: odehráno, vyplaceno, zbývá doplatit,
+  nadcházející, po letech). Organizátor vidí přehled všech. Celkový honorář akce a cizí částky nevidí nikdo jiný
+  a do kalendářů se honoráře nezapisují vůbec.
 - **Hlasování** – ankety pro celou kapelu nebo ke konkrétní akci, s jednou i více odpověďmi.
 - **Google Kalendář** – každému členovi se akce zapíše přímo do jeho Google Kalendáře, personalizovaně:
   harmonogram, adresa + odkaz na navigaci, jeho pozice v sestavě, auto, řidič a spolujezdci, kontakty, setlist.

@@ -5,6 +5,7 @@ import { after } from "next/server";
 import { redirect } from "next/navigation";
 import { requireAdmin } from "@/lib/auth";
 import { oneOf, requiredStr, str } from "@/lib/form";
+import { parsePay } from "@/lib/earnings";
 import { syncUpcomingForUser } from "@/lib/google-calendar";
 import { prisma } from "@/lib/prisma";
 
@@ -59,12 +60,14 @@ export async function addMember(bandId: string, formData: FormData) {
     update: {
       role: oneOf(str(formData, "role"), BAND_ROLES, "MEMBER"),
       instrument: str(formData, "instrument"),
+      defaultPay: parsePay(formData.get("defaultPay")),
     },
     create: {
       bandId,
       userId: user.id,
       role: oneOf(str(formData, "role"), BAND_ROLES, "MEMBER"),
       instrument: str(formData, "instrument"),
+      defaultPay: parsePay(formData.get("defaultPay")),
     },
   });
   after(() => syncUpcomingForUser(user.id));
@@ -78,6 +81,7 @@ export async function updateMember(membershipId: string, formData: FormData) {
     data: {
       role: oneOf(str(formData, "role"), BAND_ROLES, "MEMBER"),
       instrument: str(formData, "instrument"),
+      defaultPay: parsePay(formData.get("defaultPay")),
     },
   });
   revalidatePath(`/bands/${m.bandId}`);
