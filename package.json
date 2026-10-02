@@ -5,7 +5,7 @@
   "description": "Správa a organizace hudebních kapel – koncerty, sestavy, doprava, hlasování a synchronizace s Google Kalendářem.",
   "scripts": {
     "dev": "next dev",
-    "build": "prisma generate && prisma db push --skip-generate && next build",
+    "build": "sh scripts/build.sh",
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
