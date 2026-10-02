@@ -14,7 +14,7 @@ import { TIMEZONE } from "./time";
 
 export const appUrl = appBaseUrl;
 
-async function calendarClientFor(userId: string) {
+export async function calendarClientFor(userId: string) {
   if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) return null;
   const account = await prisma.account.findFirst({ where: { userId, provider: "google" } });
   if (!account?.refresh_token && !account?.access_token) return null;

@@ -1,6 +1,6 @@
 import type { Event } from "@prisma/client";
 import { toLocalInput } from "@/lib/time";
-import { CalendarClock, Info, MapPin, Sparkles } from "lucide-react";
+import { CalendarClock, CalendarSync, Info, MapPin, Sparkles } from "lucide-react";
 import { SubmitButton } from "./SubmitButton";
 
 function FormSection({ title, icon: Icon, children }: { title: string; icon: React.ElementType; children: React.ReactNode }) {
@@ -65,6 +65,13 @@ export function EventForm({
 }) {
   return (
     <form action={action} className="space-y-6">
+      {event?.externalId && (
+        <p className="flex items-start gap-2 rounded-2xl bg-brand-soft p-3 text-sm text-ink-2">
+          <CalendarSync className="mt-0.5 h-4 w-4 shrink-0 text-brand" />
+          Akce je načtená z Google Kalendáře. Název, čas začátku a konce a místo se přebírají z kalendáře – měňte je tam,
+          jinak je příští načtení přepíše. Ostatní údaje upravujte zde.
+        </p>
+      )}
       <FormSection title="Základní informace" icon={Sparkles}>
         <Field label="Název akce" name="title" required defaultValue={event?.title} placeholder="Např. Letní festival" />
         <div>

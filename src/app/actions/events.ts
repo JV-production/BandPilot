@@ -5,6 +5,7 @@ import { after } from "next/server";
 import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/auth";
 import { parsePay } from "@/lib/earnings";
+import { defaultLineup } from "@/lib/lineup";
 import { oneOf, requiredStr, str } from "@/lib/form";
 import { removeEventFromCalendars, syncEventToCalendars } from "@/lib/google-calendar";
 import { assertCanManageBand, canManageBand, getMembership, isAdmin } from "@/lib/permissions";
@@ -56,27 +57,8 @@ export async function createEvent(bandId: string, formData: FormData) {
   await assertCanManageBand(user, bandId);
   const data = eventData(formData, isAdmin(user));
 
-  // Výchozí sestava = stálí členové a vedoucí se svými nástroji.
-  const core = await prisma.bandMembership.findMany({
-    where: { bandId, role: { in: ["LEADER", "MEMBER"] } },
-    include: { user: true },
-    orderBy: { createdAt: "asc" },
-  });
-
   const event = await prisma.event.create({
-    data: {
-      ...data,
-      bandId,
-      createdById: user.id,
-      lineup: {
-        create: core.map((m, i) => ({
-          instrument: m.instrument || "hudebník",
-          userId: m.userId,
-          sortOrder: i,
-          pay: m.defaultPay,
-        })),
-      },
-    },
+    data: { ...data, bandId, createdById: user.id, lineup: { create: await defaultLineup(bandId) } },
   });
   scheduleSync(event.id);
   revalidatePath("/");

@@ -1,7 +1,10 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { CalendarDays, CalendarX2, ChevronDown, Plus, Settings2, Trash2, UserPlus, Users, Vote } from "lucide-react";
-import { addMember, deleteBand, removeMember, updateBand, updateMember } from "@/app/actions/bands";
+import { AlertTriangle, CalendarDays, CalendarSync, CalendarX2, ChevronDown, Plus, RefreshCw, Settings2, Trash2, UserPlus, Users, Vote } from "lucide-react";
+import { after } from "next/server";
+import { addMember, clearBandImport, deleteBand, removeMember, runBandImport, setBandImport, updateBand, updateMember } from "@/app/actions/bands";
+import { autoImportStale } from "@/lib/calendar-import";
+import { fmtDateTime } from "@/lib/time";
 import { requireUser } from "@/lib/auth";
 import { formatCzk } from "@/lib/earnings";
 import { BAND_ROLE } from "@/lib/labels";
@@ -39,6 +42,8 @@ export default async function BandPage({ params }: { params: Promise<{ id: strin
     },
   });
   if (!band) notFound();
+  if (band.importCalendarId) after(() => autoImportStale([id]));
+  const importedCount = band.importCalendarId ? await prisma.event.count({ where: { bandId: id, externalId: { not: null } } }) : 0;
 
   const admin = isAdmin(user);
   const manager = await canManageBand(user, id);
@@ -200,6 +205,68 @@ export default async function BandPage({ params }: { params: Promise<{ id: strin
           {(member || admin) && <NewPollForm bandId={id} eventId={null} />}
         </div>
       </section>
+
+      {admin && (
+        <section>
+          <SectionTitle icon={CalendarSync}>Import z Google Kalendáře</SectionTitle>
+          <div className="card space-y-4">
+            {band.importCalendarId ? (
+              <>
+                <div className="flex items-start gap-3">
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-ok-soft text-ok">
+                    <CalendarSync className="h-5 w-5" />
+                  </span>
+                  <div className="min-w-0 text-sm">
+                    <div className="font-semibold">Koncerty se načítají z kalendáře</div>
+                    <div className="truncate text-ink-2">{band.importCalendarId}</div>
+                    <div className="text-xs text-ink-3">
+                      {importedCount} importovaných akcí
+                      {band.importedAt && ` · naposledy ${fmtDateTime(band.importedAt)}`}
+                    </div>
+                  </div>
+                </div>
+                {band.importError && (
+                  <p className="flex items-start gap-2 rounded-2xl bg-bad-soft p-3 text-sm text-bad">
+                    <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" /> {band.importError}
+                  </p>
+                )}
+                <div className="flex flex-wrap gap-2">
+                  <form action={runBandImport.bind(null, id)}>
+                    <SubmitButton className="btn-secondary btn-sm">
+                      <RefreshCw className="h-3.5 w-3.5" /> Načíst teď
+                    </SubmitButton>
+                  </form>
+                  <form action={clearBandImport.bind(null, id)}>
+                    <SubmitButton className="btn-danger btn-sm" confirm="Zrušit import? Už načtené koncerty zůstanou, jen se přestanou aktualizovat.">
+                      Zrušit import
+                    </SubmitButton>
+                  </form>
+                </div>
+                <p className="text-xs text-ink-3">
+                  Aktualizuje se automaticky (při otevření aplikace nejvýš každých 30 minut a jednou denně). Z kalendáře se
+                  přebírá název, čas a místo; odjezd, zvukovku, sestavu a další údaje doplňujete v aplikaci a zůstanou zachované.
+                </p>
+              </>
+            ) : (
+              <form action={setBandImport.bind(null, id)} className="space-y-3">
+                <p className="text-sm text-ink-2">
+                  Máte koncerty této kapely v Google Kalendáři? Zadejte jeho ID a aplikace z něj budoucí události sama načte
+                  a bude je průběžně aktualizovat.
+                </p>
+                <div>
+                  <label className="label">ID kalendáře</label>
+                  <input name="calendarId" required className="input font-mono text-sm" placeholder="např. abc123@group.calendar.google.com" />
+                  <p className="mt-1.5 text-xs text-ink-3">
+                    Google Kalendář → u kalendáře ⋮ → Nastavení a sdílení → Integrace kalendáře → <b>ID kalendáře</b>. Pro váš
+                    hlavní kalendář stačí napsat svůj e-mail.
+                  </p>
+                </div>
+                <SubmitButton>Uložit a načíst koncerty</SubmitButton>
+              </form>
+            )}
+          </div>
+        </section>
+      )}
 
       {admin && (
         <section>

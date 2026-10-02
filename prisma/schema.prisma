@@ -86,6 +86,13 @@ model Band {
   color       String   @default("#6366f1")
   createdAt   DateTime @default(now())
 
+  // Import koncertů z existujícího Google Kalendáře
+  importCalendarId String?
+  // Čí Google účet se pro čtení kalendáře použije (organizátor, který import nastavil)
+  importOwnerId    String?
+  importedAt       DateTime?
+  importError      String?
+
   memberships BandMembership[]
   events      Event[]
   polls       Poll[]
@@ -140,6 +147,9 @@ model Event {
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 
+  // ID události ve zdrojovém Google Kalendáři (u importovaných koncertů)
+  externalId      String?
+
   band          Band           @relation(fields: [bandId], references: [id], onDelete: Cascade)
   createdBy     User?          @relation("EventCreator", fields: [createdById], references: [id], onDelete: SetNull)
   attendances   Attendance[]
@@ -149,6 +159,7 @@ model Event {
   calendarLinks CalendarLink[]
 
   @@index([bandId, startAt])
+  @@index([bandId, externalId])
 }
 
 // Odpověď člena, zda může hrát

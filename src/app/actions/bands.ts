@@ -6,7 +6,8 @@ import { redirect } from "next/navigation";
 import { requireAdmin } from "@/lib/auth";
 import { oneOf, requiredStr, str } from "@/lib/form";
 import { parsePay } from "@/lib/earnings";
-import { syncUpcomingForUser } from "@/lib/google-calendar";
+import { importBandCalendarSafe } from "@/lib/calendar-import";
+import { hasGoogleCalendar, syncUpcomingForUser } from "@/lib/google-calendar";
 import { prisma } from "@/lib/prisma";
 
 const BAND_ROLES = ["LEADER", "MEMBER", "SUBSTITUTE"] as const;
@@ -96,4 +97,38 @@ export async function removeMember(membershipId: string) {
   await prisma.carSeat.deleteMany({ where: { userId: m.userId, car: { event: upcoming } } });
   after(() => syncUpcomingForUser(m.userId));
   revalidatePath(`/bands/${m.bandId}`);
+}
+
+/** Nastaví Google Kalendář, ze kterého se do kapely importují koncerty, a hned ho načte. */
+export async function setBandImport(bandId: string, formData: FormData) {
+  const admin = await requireAdmin();
+  const calendarId = str(formData, "calendarId");
+  if (!calendarId) throw new Error("Zadejte ID kalendáře.");
+  if (!(await hasGoogleCalendar(admin.id))) {
+    throw new Error("Váš účet nemá propojený Google Kalendář. Odhlaste se a přihlaste znovu přes Google (povolte kalendář).");
+  }
+  await prisma.band.update({
+    where: { id: bandId },
+    data: { importCalendarId: calendarId, importOwnerId: admin.id, importError: null },
+  });
+  await importBandCalendarSafe(bandId);
+  revalidatePath(`/bands/${bandId}`);
+  revalidatePath("/");
+}
+
+export async function runBandImport(bandId: string) {
+  await requireAdmin();
+  await importBandCalendarSafe(bandId);
+  revalidatePath(`/bands/${bandId}`);
+  revalidatePath("/");
+}
+
+export async function clearBandImport(bandId: string) {
+  await requireAdmin();
+  // Už importované koncerty zůstávají – jen se přestanou aktualizovat.
+  await prisma.band.update({
+    where: { id: bandId },
+    data: { importCalendarId: null, importOwnerId: null, importedAt: null, importError: null },
+  });
+  revalidatePath(`/bands/${bandId}`);
 }

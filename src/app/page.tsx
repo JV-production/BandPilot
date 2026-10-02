@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { BellRing, CalendarX2, Music2, Plus } from "lucide-react";
+import { after } from "next/server";
 import { requireUser } from "@/lib/auth";
+import { autoImportStale } from "@/lib/calendar-import";
 import { isAdmin, visibleBandIds } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
 import { fmt } from "@/lib/time";
@@ -12,6 +14,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   const { past } = await searchParams;
   const showPast = past === "1";
   const bandIds = await visibleBandIds(user);
+  after(() => autoImportStale(bandIds));
   const now = new Date(Date.now() - 12 * 3600 * 1000);
 
   const [events, memberships] = await Promise.all([
