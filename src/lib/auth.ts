@@ -4,6 +4,8 @@ import { getServerSession } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import GoogleProvider from "next-auth/providers/google";
 import { redirect } from "next/navigation";
+import { canLogIn, loginLocked, parseEmails } from "./access";
+import { isProduction } from "./env";
 import { prisma } from "./prisma";
 
 export const GOOGLE_SCOPES = [
@@ -13,12 +15,10 @@ export const GOOGLE_SCOPES = [
   "https://www.googleapis.com/auth/calendar.events",
 ].join(" ");
 
-const adminEmails = (process.env.ADMIN_EMAILS || "")
-  .split(",")
-  .map((e) => e.trim().toLowerCase())
-  .filter(Boolean);
+const adminEmails = parseEmails(process.env.ADMIN_EMAILS);
 
-export const devLoginEnabled = process.env.ENABLE_DEV_LOGIN === "true";
+// Přihlášení jen e-mailem slouží pro vývoj a náhledy – v ostré verzi je vždy vypnuté.
+export const devLoginEnabled = process.env.ENABLE_DEV_LOGIN === "true" && !isProduction;
 
 const providers: NextAuthOptions["providers"] = [];
 
@@ -60,8 +60,22 @@ export const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(prisma),
   session: { strategy: "jwt" },
   providers,
-  pages: { signIn: "/login" },
+  pages: { signIn: "/login", error: "/login" },
   callbacks: {
+    async signIn({ user }) {
+      // Vývoj a náhled (jen testovací data) – bez omezení.
+      if (devLoginEnabled) return true;
+      const email = user.email?.toLowerCase();
+      const existing = email ? await prisma.user.findUnique({ where: { email } }) : null;
+      const allowed = canLogIn({
+        email,
+        known: !!existing,
+        isAdmin: existing?.role === "ADMIN",
+        adminEmails,
+        locked: loginLocked(),
+      });
+      return allowed ? true : "/login?error=AccessDenied";
+    },
     async jwt({ token, user }) {
       if (user) token.sub = user.id;
       return token;
@@ -97,7 +111,12 @@ export const authOptions: NextAuthOptions = {
 export async function getCurrentUser() {
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) return null;
-  return prisma.user.findUnique({ where: { id: session.user.id } });
+  const user = await prisma.user.findUnique({ where: { id: session.user.id } });
+  // Při uzamčení aplikace odhlásíme i ty, kdo už přihlášení byli.
+  if (user && loginLocked() && !canLogIn({ email: user.email, known: true, isAdmin: user.role === "ADMIN", adminEmails, locked: true })) {
+    return null;
+  }
+  return user;
 }
 
 export type CurrentUser = NonNullable<Awaited<ReturnType<typeof getCurrentUser>>>;

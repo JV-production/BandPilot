@@ -9,9 +9,10 @@ import {
   eventFullInclude,
   type FullEvent,
 } from "./event-details";
+import { appBaseUrl } from "./env";
 import { TIMEZONE } from "./time";
 
-export const appUrl = () => (process.env.NEXTAUTH_URL || "http://localhost:3000").replace(/\/$/, "");
+export const appUrl = appBaseUrl;
 
 async function calendarClientFor(userId: string) {
   if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) return null;
