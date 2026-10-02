@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ChevronRight, Music2, Plus } from "lucide-react";
+import { AlertTriangle, ChevronRight, Music2, Plus } from "lucide-react";
 import { requireUser } from "@/lib/auth";
 import { BAND_ROLE } from "@/lib/labels";
 import { isAdmin, visibleBandIds } from "@/lib/permissions";
@@ -20,6 +20,10 @@ export default async function BandsPage() {
     orderBy: { name: "asc" },
   });
 
+  const counts = new Map<string, number>();
+  for (const b of bands) counts.set(b.name.trim().toLowerCase(), (counts.get(b.name.trim().toLowerCase()) ?? 0) + 1);
+  const twice = [...new Set(bands.filter((b) => (counts.get(b.name.trim().toLowerCase()) ?? 0) > 1).map((b) => b.name))];
+
   return (
     <div>
       <PageHeader
@@ -33,6 +37,15 @@ export default async function BandsPage() {
           )
         }
       />
+      {isAdmin(user) && twice.length > 0 && (
+        <p className="mb-4 flex items-start gap-2 rounded-2xl bg-warn-soft p-3 text-sm text-warn">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+          <span>
+            Kapela {twice.map((n) => `„${n}“`).join(", ")} je založená vícekrát – akce se pak zobrazují dvakrát. Jednu z
+            nich otevřete a dole ji smažte (Nastavení kapely → Smazat kapelu).
+          </span>
+        </p>
+      )}
       {bands.length === 0 ? (
         <Empty icon={Music2}>Zatím žádné kapely.</Empty>
       ) : (

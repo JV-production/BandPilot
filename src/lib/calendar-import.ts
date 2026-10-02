@@ -82,7 +82,56 @@ export async function importBandCalendar(bandId: string, opts: ImportOptions = {
   }
 }
 
-/** Sloučí zdvojené importované akce (stejné ID v kalendáři) – ponechá tu s nejvíce daty. */
+type EventWithCounts = { id: string; createdAt: Date; _count: { attendances: number; cars: number; polls: number } };
+const score = (e: EventWithCounts) => e._count.attendances + e._count.cars + e._count.polls;
+const countsInclude = { _count: { select: { attendances: true, cars: true, polls: true } } } as const;
+
+/** Přesune odpovědi, auta a ankety z akce `dropId` na `keepId` a `dropId` smaže (i z kalendářů členů). */
+export async function mergeEvents(keepId: string, dropId: string) {
+  const keepAnswers = new Set((await prisma.attendance.findMany({ where: { eventId: keepId } })).map((a) => a.userId));
+  for (const a of await prisma.attendance.findMany({ where: { eventId: dropId } })) {
+    if (keepAnswers.has(a.userId)) await prisma.attendance.delete({ where: { id: a.id } });
+    else await prisma.attendance.update({ where: { id: a.id }, data: { eventId: keepId } });
+  }
+  await prisma.poll.updateMany({ where: { eventId: dropId }, data: { eventId: keepId } });
+
+  const keepDrivers = new Set((await prisma.car.findMany({ where: { eventId: keepId } })).map((c) => c.driverId));
+  const keepSeated = new Set((await prisma.carSeat.findMany({ where: { eventId: keepId } })).map((s) => s.userId));
+  for (const car of await prisma.car.findMany({ where: { eventId: dropId }, include: { seatsTaken: true } })) {
+    if (keepDrivers.has(car.driverId) || keepSeated.has(car.driverId)) {
+      await prisma.car.delete({ where: { id: car.id } });
+      continue;
+    }
+    for (const seat of car.seatsTaken) {
+      if (keepSeated.has(seat.userId) || keepDrivers.has(seat.userId)) await prisma.carSeat.delete({ where: { id: seat.id } });
+      else {
+        await prisma.carSeat.update({ where: { id: seat.id }, data: { eventId: keepId } });
+        keepSeated.add(seat.userId);
+      }
+    }
+    await prisma.car.update({ where: { id: car.id }, data: { eventId: keepId } });
+    keepDrivers.add(car.driverId);
+  }
+
+  await removeEventFromCalendars(dropId);
+  await prisma.event.delete({ where: { id: dropId } });
+}
+
+/** Sloučí skupinu stejných akcí do jedné. `preferred` = ID akcí, které mají přednost (např. platné v kalendáři). */
+async function mergeGroup(events: (EventWithCounts & { externalId: string | null })[], preferred?: Set<string>) {
+  const ranked = [...events].sort(
+    (a, b) =>
+      Number(!!preferred && !!b.externalId && preferred.has(b.externalId)) -
+        Number(!!preferred && !!a.externalId && preferred.has(a.externalId)) ||
+      score(b) - score(a) ||
+      a.createdAt.getTime() - b.createdAt.getTime(),
+  );
+  const [keep, ...drop] = ranked;
+  for (const d of drop) await mergeEvents(keep.id, d.id);
+  return drop.length;
+}
+
+/** Sloučí zdvojené importované akce se stejným ID v kalendáři. */
 export async function dedupeImported(bandId: string): Promise<number> {
   const dups = await prisma.event.groupBy({
     by: ["externalId"],
@@ -92,22 +141,14 @@ export async function dedupeImported(bandId: string): Promise<number> {
   });
   let removed = 0;
   for (const d of dups) {
-    const events = await prisma.event.findMany({
-      where: { bandId, externalId: d.externalId },
-      include: { _count: { select: { attendances: true, cars: true, polls: true } } },
-      orderBy: { createdAt: "asc" },
-    });
-    const score = (e: (typeof events)[number]) => e._count.attendances + e._count.cars + e._count.polls;
-    const keep = events.reduce((best, e) => (score(e) > score(best) ? e : best), events[0]);
-    for (const e of events) {
-      if (e.id === keep.id) continue;
-      await removeEventFromCalendars(e.id);
-      await prisma.event.delete({ where: { id: e.id } });
-      removed++;
-    }
+    const events = await prisma.event.findMany({ where: { bandId, externalId: d.externalId }, include: countsInclude });
+    removed += await mergeGroup(events);
   }
   return removed;
 }
+
+/** Stejný koncert = stejný název a stejný začátek. */
+export const sameEventKey = (title: string, startAt: Date) => `${title.trim().toLowerCase()}|${startAt.getTime()}`;
 
 async function runImport(bandId: string, opts: ImportOptions): Promise<ImportResult> {
   const band = await prisma.band.findUnique({ where: { id: bandId } });
@@ -117,12 +158,13 @@ async function runImport(bandId: string, opts: ImportOptions): Promise<ImportRes
   const calendar = await calendarClientFor(band.importOwnerId);
   if (!calendar) throw new Error("Účet, který import nastavil, nemá propojený Google Kalendář. Přihlaste se znovu přes Google.");
 
+  const timeMin = new Date(Date.now() - 24 * 3600 * 1000);
   const items: calendar_v3.Schema$Event[] = [];
   let pageToken: string | undefined;
   do {
     const res = await calendar.events.list({
       calendarId: band.importCalendarId,
-      timeMin: new Date(Date.now() - 24 * 3600 * 1000).toISOString(),
+      timeMin: timeMin.toISOString(),
       timeMax: new Date(Date.now() + 2 * 365 * 24 * 3600 * 1000).toISOString(),
       singleEvents: true,
       showDeleted: true,
@@ -133,21 +175,39 @@ async function runImport(bandId: string, opts: ImportOptions): Promise<ImportRes
     pageToken = res.data.nextPageToken ?? undefined;
   } while (pageToken && items.length < 2000);
 
+  const mapped = items.map(mapGoogleEvent).filter((f): f is ImportedFields => !!f);
+  // Když je v kalendáři stejný koncert vícekrát (stejný název i začátek), bereme ho jen jednou.
+  const live: ImportedFields[] = [];
+  const liveKeys = new Set<string>();
+  for (const f of mapped) {
+    if (f.cancelled) continue;
+    const key = sameEventKey(f.title, f.startAt);
+    if (liveKeys.has(key)) continue;
+    liveKeys.add(key);
+    live.push(f);
+  }
+  const liveIds = new Set(live.map((f) => f.externalId));
+
   const result: ImportResult = { created: 0, updated: 0, cancelled: 0 };
-  const touched: string[] = [];
+  const touched = new Set<string>();
 
-  for (const item of items) {
-    const f = mapGoogleEvent(item);
-    if (!f) continue;
-    const existing = await prisma.event.findFirst({ where: { bandId, externalId: f.externalId } });
-
-    if (f.cancelled) {
-      if (existing && existing.status !== "CANCELLED") {
-        await prisma.event.update({ where: { id: existing.id }, data: { status: "CANCELLED" } });
-        result.cancelled++;
-        touched.push(existing.id);
+  for (const f of live) {
+    let existing = await prisma.event.findFirst({ where: { bandId, externalId: f.externalId } });
+    if (!existing) {
+      // Stejný koncert už v kapele je (z jiného kalendáře, dřívějšího importu nebo založený ručně) – připojíme ho, nezakládáme nový.
+      const twin = await prisma.event.findFirst({
+        where: {
+          bandId,
+          title: f.title,
+          startAt: f.startAt,
+          OR: [{ externalId: null }, { externalId: { notIn: [...liveIds] } }],
+        },
+        orderBy: { createdAt: "asc" },
+      });
+      if (twin) {
+        existing = await prisma.event.update({ where: { id: twin.id }, data: { externalId: f.externalId } });
+        touched.add(twin.id);
       }
-      continue;
     }
 
     if (!existing) {
@@ -167,7 +227,7 @@ async function runImport(bandId: string, opts: ImportOptions): Promise<ImportRes
         },
       });
       result.created++;
-      touched.push(created.id);
+      touched.add(created.id);
       continue;
     }
 
@@ -175,6 +235,7 @@ async function runImport(bandId: string, opts: ImportOptions): Promise<ImportRes
     const locationChanged = eventLocation(existing) !== f.venueAddress;
     const changed =
       locationChanged ||
+      existing.status === "CANCELLED" ||
       existing.title !== f.title ||
       existing.startAt.getTime() !== f.startAt.getTime() ||
       (existing.endAt?.getTime() ?? null) !== (f.endAt?.getTime() ?? null);
@@ -185,23 +246,54 @@ async function runImport(bandId: string, opts: ImportOptions): Promise<ImportRes
           title: f.title,
           startAt: f.startAt,
           endAt: f.endAt,
+          ...(existing.status === "CANCELLED" ? { status: "CONFIRMED" } : {}),
           ...(locationChanged ? { venueAddress: f.venueAddress, venueName: f.venueName } : {}),
         },
       });
       result.updated++;
-      touched.push(existing.id);
+      touched.add(existing.id);
+    }
+  }
+
+  // Sloučit zbylé dvojice v kapele (stejný název + začátek); přednost má akce platná v kalendáři.
+  const upcoming = await prisma.event.findMany({
+    where: { bandId, startAt: { gte: timeMin }, status: { not: "CANCELLED" } },
+    include: countsInclude,
+  });
+  const groups = new Map<string, typeof upcoming>();
+  for (const e of upcoming) {
+    const key = sameEventKey(e.title, e.startAt);
+    groups.set(key, [...(groups.get(key) ?? []), e]);
+  }
+  for (const group of groups.values()) {
+    if (group.length < 2 || !group.some((e) => e.externalId)) continue;
+    await mergeGroup(group, liveIds);
+  }
+
+  // Importované akce, které v kalendáři už nejsou (smazané), označíme jako zrušené – nic nemažeme.
+  const stale = await prisma.event.findMany({
+    where: { bandId, startAt: { gte: timeMin }, status: { not: "CANCELLED" }, externalId: { not: null } },
+    select: { id: true, externalId: true },
+  });
+  for (const e of stale) {
+    if (e.externalId && !liveIds.has(e.externalId)) {
+      await prisma.event.update({ where: { id: e.id }, data: { status: "CANCELLED" } });
+      result.cancelled++;
+      touched.add(e.id);
     }
   }
 
   await prisma.band.update({ where: { id: bandId }, data: { importedAt: new Date(), importError: null } });
 
-  // Osobní kalendáře členů se aktualizují až po odpovědi (import je tak rychlý).
-  // Navíc odstraníme dřívější osobní kopie organizátora, který kalendář kapely už má.
+  // Osobní kalendáře členů; navíc odstraníme dřívější osobní kopie organizátora, který kalendář kapely už má.
   const ownerCopies = await prisma.calendarLink.findMany({
     where: { userId: band.importOwnerId, event: { bandId, externalId: { not: null } } },
     select: { eventId: true },
   });
-  const toSync = [...new Set([...touched, ...ownerCopies.map((l) => l.eventId)])];
+  const existingIds = new Set(
+    (await prisma.event.findMany({ where: { id: { in: [...touched] } }, select: { id: true } })).map((e) => e.id),
+  );
+  const toSync = [...new Set([...[...touched].filter((id) => existingIds.has(id)), ...ownerCopies.map((l) => l.eventId)])];
   const syncAll = async () => {
     for (const id of toSync) await syncEventToCalendars(id);
   };
