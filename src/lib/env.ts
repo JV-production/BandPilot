@@ -15,11 +15,15 @@ export function databaseUrl(): string | undefined {
 
 /** Veřejná adresa aplikace. Náhled používá stálou adresu své větve. */
 export function appBaseUrl(): string {
-  if (isPreview && process.env.VERCEL_BRANCH_URL) return `https://${process.env.VERCEL_BRANCH_URL}`;
+  if (isPreview) {
+    // Vlastní adresa náhledu (např. https://nahled.bandpilot.cz), jinak stálá adresa větve od Vercelu.
+    if (process.env.PREVIEW_URL) return process.env.PREVIEW_URL.replace(/\/$/, "");
+    if (process.env.VERCEL_BRANCH_URL) return `https://${process.env.VERCEL_BRANCH_URL}`;
+  }
   return (process.env.NEXTAUTH_URL || "http://localhost:3000").replace(/\/$/, "");
 }
 
 // NextAuth čte adresu z NEXTAUTH_URL – v náhledu ji nastavíme na adresu větve.
-if (isPreview && process.env.VERCEL_BRANCH_URL) {
+if (isPreview && (process.env.PREVIEW_URL || process.env.VERCEL_BRANCH_URL)) {
   process.env.NEXTAUTH_URL = appBaseUrl();
 }
