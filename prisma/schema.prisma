@@ -92,6 +92,8 @@ model Band {
   importOwnerId    String?
   importedAt       DateTime?
   importError      String?
+  // Zámek proti souběžnému importu (zabrání zdvojení akcí)
+  importLockUntil  DateTime?
   // Google push notifikace (okamžité načtení změn z kalendáře)
   watchChannelId   String?
   watchResourceId  String?

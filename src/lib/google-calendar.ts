@@ -111,11 +111,8 @@ export async function syncEventToCalendars(eventId: string) {
   const event = await prisma.event.findUnique({ where: { id: eventId }, include: eventFullInclude });
   if (!event) return;
   const recipients = new Set(calendarRecipients(event));
-  // Když je kalendář kapely hlavním kalendářem organizátora, osobní kopii mu nezapisujeme (byla by tam dvakrát).
-  const owner = event.band.importOwnerId ? event.band.memberships.find((m) => m.userId === event.band.importOwnerId) : null;
-  if (owner && (event.band.importCalendarId === "primary" || event.band.importCalendarId === owner.user.email)) {
-    recipients.delete(owner.userId);
-  }
+  // Kdo napojil kalendář kapely, ten koncerty v Google Kalendáři už má – osobní kopii mu nezapisujeme (byly by tam 2×).
+  if (event.externalId && event.band.importCalendarId && event.band.importOwnerId) recipients.delete(event.band.importOwnerId);
   const linked = await prisma.calendarLink.findMany({ where: { eventId }, select: { userId: true } });
   const toRemove = linked.map((l) => l.userId).filter((id) => !recipients.has(id));
 

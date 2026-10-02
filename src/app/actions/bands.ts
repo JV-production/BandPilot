@@ -114,14 +114,14 @@ export async function setBandImport(bandId: string, formData: FormData) {
     data: { importCalendarId: calendarId, importOwnerId: admin.id, importError: null },
   });
   // Načíst koncerty z kalendáře a zapnout okamžité notifikace o změnách (kalendář se nijak nemění).
-  if (await importBandCalendarSafe(bandId)) await ensureWatch(bandId);
+  if (await importBandCalendarSafe(bandId, { deferSync: (task) => after(task) })) await ensureWatch(bandId);
   revalidatePath(`/bands/${bandId}`);
   revalidatePath("/");
 }
 
 export async function runBandImport(bandId: string) {
   await requireAdmin();
-  if (await importBandCalendarSafe(bandId)) await ensureWatch(bandId);
+  if (await importBandCalendarSafe(bandId, { deferSync: (task) => after(task) })) await ensureWatch(bandId);
   revalidatePath(`/bands/${bandId}`);
   revalidatePath("/");
 }

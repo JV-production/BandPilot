@@ -2,7 +2,7 @@
 import type { calendar_v3 } from "googleapis";
 import { fromZonedTime } from "date-fns-tz";
 import { ensureWatch, eventLocation } from "./band-calendar";
-import { calendarClientFor, syncEventToCalendars } from "./google-calendar";
+import { calendarClientFor, removeEventFromCalendars, syncEventToCalendars } from "./google-calendar";
 import { defaultLineup } from "./lineup";
 import { prisma } from "./prisma";
 import { TIMEZONE } from "./time";
@@ -59,10 +59,60 @@ export function mapGoogleEvent(e: calendar_v3.Schema$Event): ImportedFields | nu
 
 export type ImportResult = { created: number; updated: number; cancelled: number };
 
-/** Načte budoucí události ze zdrojového kalendáře kapely a vytvoří/aktualizuje koncerty. */
-export async function importBandCalendar(bandId: string): Promise<ImportResult> {
+const LOCK_MS = 2 * 60 * 1000;
+
+/** Načte budoucí události ze zdrojového kalendáře kapely a vytvoří/aktualizuje koncerty.
+ *  Běží vždy jen jednou současně (zámek v databázi) – souběžné spuštění se přeskočí. */
+type ImportOptions = {
+  /** Předá aktualizaci osobních kalendářů volajícímu (např. do after() v server action). */
+  deferSync?: (task: () => Promise<void>) => void;
+};
+
+export async function importBandCalendar(bandId: string, opts: ImportOptions = {}): Promise<ImportResult> {
+  const now = new Date();
+  const claimed = await prisma.band.updateMany({
+    where: { id: bandId, OR: [{ importLockUntil: null }, { importLockUntil: { lt: now } }] },
+    data: { importLockUntil: new Date(now.getTime() + LOCK_MS) },
+  });
+  if (claimed.count === 0) return { created: 0, updated: 0, cancelled: 0 };
+  try {
+    return await runImport(bandId, opts);
+  } finally {
+    await prisma.band.update({ where: { id: bandId }, data: { importLockUntil: null } });
+  }
+}
+
+/** Sloučí zdvojené importované akce (stejné ID v kalendáři) – ponechá tu s nejvíce daty. */
+export async function dedupeImported(bandId: string): Promise<number> {
+  const dups = await prisma.event.groupBy({
+    by: ["externalId"],
+    where: { bandId, externalId: { not: null } },
+    _count: { _all: true },
+    having: { externalId: { _count: { gt: 1 } } },
+  });
+  let removed = 0;
+  for (const d of dups) {
+    const events = await prisma.event.findMany({
+      where: { bandId, externalId: d.externalId },
+      include: { _count: { select: { attendances: true, cars: true, polls: true } } },
+      orderBy: { createdAt: "asc" },
+    });
+    const score = (e: (typeof events)[number]) => e._count.attendances + e._count.cars + e._count.polls;
+    const keep = events.reduce((best, e) => (score(e) > score(best) ? e : best), events[0]);
+    for (const e of events) {
+      if (e.id === keep.id) continue;
+      await removeEventFromCalendars(e.id);
+      await prisma.event.delete({ where: { id: e.id } });
+      removed++;
+    }
+  }
+  return removed;
+}
+
+async function runImport(bandId: string, opts: ImportOptions): Promise<ImportResult> {
   const band = await prisma.band.findUnique({ where: { id: bandId } });
   if (!band?.importCalendarId || !band.importOwnerId) throw new Error("Kapela nemá nastavený kalendář pro import.");
+  await dedupeImported(bandId);
 
   const calendar = await calendarClientFor(band.importOwnerId);
   if (!calendar) throw new Error("Účet, který import nastavil, nemá propojený Google Kalendář. Přihlaste se znovu přes Google.");
@@ -144,14 +194,28 @@ export async function importBandCalendar(bandId: string): Promise<ImportResult> 
   }
 
   await prisma.band.update({ where: { id: bandId }, data: { importedAt: new Date(), importError: null } });
-  for (const id of touched) await syncEventToCalendars(id);
+
+  // Osobní kalendáře členů se aktualizují až po odpovědi (import je tak rychlý).
+  // Navíc odstraníme dřívější osobní kopie organizátora, který kalendář kapely už má.
+  const ownerCopies = await prisma.calendarLink.findMany({
+    where: { userId: band.importOwnerId, event: { bandId, externalId: { not: null } } },
+    select: { eventId: true },
+  });
+  const toSync = [...new Set([...touched, ...ownerCopies.map((l) => l.eventId)])];
+  const syncAll = async () => {
+    for (const id of toSync) await syncEventToCalendars(id);
+  };
+  if (toSync.length) {
+    if (opts.deferSync) opts.deferSync(syncAll);
+    else await syncAll();
+  }
   return result;
 }
 
 /** Import s uložením chyby ke kapele (pro automatické spouštění). */
-export async function importBandCalendarSafe(bandId: string) {
+export async function importBandCalendarSafe(bandId: string, opts: ImportOptions = {}) {
   try {
-    return await importBandCalendar(bandId);
+    return await importBandCalendar(bandId, opts);
   } catch (err) {
     const message = describeError(err);
     console.error("[calendar-import]", bandId, message);
