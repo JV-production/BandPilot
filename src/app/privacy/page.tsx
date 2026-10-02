@@ -9,12 +9,12 @@ export default function PrivacyPage() {
   const email = contactEmail();
   return (
     <div className="mx-auto max-w-2xl px-4 py-8">
-      <Link href="/" className="text-sm text-brand-600">← BandPilot</Link>
-      <article className="card mt-3 space-y-4 text-sm leading-relaxed text-slate-700 [&_h2]:mt-6 [&_h2]:text-base [&_h2]:font-bold [&_h2]:text-slate-900">
-        <h1 className="text-2xl font-extrabold text-slate-900">Zásady ochrany osobních údajů</h1>
+      <Link href="/" className="text-sm text-brand">← BandPilot</Link>
+      <article className="card mt-3 space-y-4 text-sm leading-relaxed text-ink-2 [&_h2]:mt-6 [&_h2]:text-base [&_h2]:font-bold [&_h2]:text-ink">
+        <h1 className="font-display text-3xl font-black text-ink">Zásady ochrany osobních údajů</h1>
         <p>
           BandPilot je aplikace pro organizaci hudebních kapel – koncertů, sestav, dopravy a hlasování. Aplikaci
-          provozuje organizátor kapel{email && <> (kontakt: <a className="text-brand-600" href={`mailto:${email}`}>{email}</a>)</>}.
+          provozuje organizátor kapel{email && <> (kontakt: <a className="text-brand" href={`mailto:${email}`}>{email}</a>)</>}.
           Přístup do aplikace mají jen lidé, kterým ho organizátor přidělil.
         </p>
 
@@ -32,13 +32,13 @@ export default function PrivacyPage() {
           vašich kapel, aktualizovali je při změně a smazali je, pokud se akce zruší nebo na ní nehrajete. Jiné události ve
           vašem kalendáři nečteme, neměníme ani neukládáme. Synchronizaci můžete kdykoli vypnout v Nastavení aplikace a
           přístup odebrat na stránce{" "}
-          <a className="text-brand-600" href="https://myaccount.google.com/permissions" target="_blank" rel="noreferrer">
+          <a className="text-brand" href="https://myaccount.google.com/permissions" target="_blank" rel="noreferrer">
             myaccount.google.com/permissions
           </a>.
         </p>
         <p>
           Využití informací získaných z Google API je v souladu se zásadami{" "}
-          <a className="text-brand-600" href="https://developers.google.com/terms/api-services-user-data-policy" target="_blank" rel="noreferrer">
+          <a className="text-brand" href="https://developers.google.com/terms/api-services-user-data-policy" target="_blank" rel="noreferrer">
             Google API Services User Data Policy
           </a>
           , včetně požadavků na omezené použití (Limited Use).
@@ -54,7 +54,7 @@ export default function PrivacyPage() {
         <h2>Uchování a smazání</h2>
         <p>
           Údaje uchováváme po dobu, kdy aplikaci používáte. O smazání svého účtu a údajů můžete kdykoli požádat
-          organizátora{email && <> na adrese <a className="text-brand-600" href={`mailto:${email}`}>{email}</a></>}.
+          organizátora{email && <> na adrese <a className="text-brand" href={`mailto:${email}`}>{email}</a></>}.
           Smazáním účtu se odstraní i vaše odpovědi, místa v autech a hlasy.
         </p>
 

@@ -1,3 +1,4 @@
+import { Check, Lock, LockOpen, Trash2 } from "lucide-react";
 import { deletePoll, togglePollClosed, vote } from "@/app/actions/polls";
 import { SubmitButton } from "./SubmitButton";
 import { personName } from "./ui";
@@ -14,62 +15,69 @@ export type PollWithVotes = {
 
 export function PollCard({ poll, userId, canManage, canVote }: { poll: PollWithVotes; userId: string; canManage: boolean; canVote: boolean }) {
   const voters = new Set(poll.options.flatMap((o) => o.votes.map((v) => v.userId)));
-  const max = Math.max(1, ...poll.options.map((o) => o.votes.length));
+  const total = Math.max(1, voters.size);
   const canEdit = canManage || poll.createdById === userId;
+  const open = canVote && !poll.closed;
 
   return (
     <div className="card">
-      <div className="mb-3 flex items-start justify-between gap-2">
-        <div>
-          <div className="font-bold">{poll.question}</div>
-          <div className="text-xs text-slate-500">
-            {personName(poll.createdBy)} · {voters.size} hlasujících
-            {poll.multiple && " · více možností"}
-            {poll.closed && " · uzavřeno"}
-          </div>
+      <div className="mb-3">
+        <div className="text-[17px] font-bold leading-snug">{poll.question}</div>
+        <div className="mt-0.5 text-xs text-ink-3">
+          {personName(poll.createdBy)} · {voters.size} hlasujících
+          {poll.multiple && " · více možností"}
+          {poll.closed && " · uzavřeno"}
         </div>
       </div>
       <form action={vote.bind(null, poll.id)} className="space-y-2">
         {poll.options.map((option) => {
           const mine = option.votes.some((v) => v.userId === userId);
+          const pct = Math.round((option.votes.length / total) * 100);
           return (
-            <label key={option.id} className="relative block overflow-hidden rounded-xl border border-slate-200 p-3">
-              <span
-                className="absolute inset-y-0 left-0 bg-brand-50"
-                style={{ width: `${(option.votes.length / max) * 100}%` }}
-                aria-hidden
-              />
+            <label
+              key={option.id}
+              className={`relative block cursor-pointer overflow-hidden rounded-2xl border p-3 transition has-[:checked]:border-brand ${
+                mine ? "border-brand/60" : "border-line"
+              }`}
+            >
+              <span className="absolute inset-y-0 left-0 bg-brand-soft transition-all" style={{ width: `${pct}%` }} aria-hidden />
               <span className="relative flex items-center gap-3">
-                {canVote && !poll.closed && (
+                {open && (
                   <input
                     type={poll.multiple ? "checkbox" : "radio"}
                     name="optionId"
                     value={option.id}
                     defaultChecked={mine}
-                    className="h-5 w-5 accent-brand-600"
+                    className="h-5 w-5 accent-[rgb(var(--brand))]"
                   />
                 )}
-                <span className="flex-1">
-                  <span className={mine ? "font-semibold" : ""}>{option.text}</span>
+                <span className="min-w-0 flex-1">
+                  <span className="flex items-center gap-1.5 font-semibold">
+                    {option.text}
+                    {mine && <Check className="h-4 w-4 text-brand" />}
+                  </span>
                   {option.votes.length > 0 && (
-                    <span className="block text-xs text-slate-500">{option.votes.map((v) => personName(v.user)).join(", ")}</span>
+                    <span className="block truncate text-xs text-ink-2">{option.votes.map((v) => personName(v.user)).join(", ")}</span>
                   )}
                 </span>
-                <span className="text-sm font-bold text-brand-700">{option.votes.length}</span>
+                <span className="text-sm font-bold tabular-nums text-brand">{pct}%</span>
               </span>
             </label>
           );
         })}
-        {canVote && !poll.closed && <SubmitButton className="btn-primary btn-sm">Hlasovat</SubmitButton>}
+        {open && <SubmitButton className="btn-primary btn-sm mt-1">Hlasovat</SubmitButton>}
       </form>
       {canEdit && (
-        <div className="mt-3 flex gap-2 border-t border-slate-100 pt-3">
+        <div className="mt-3 flex gap-2 border-t border-line/70 pt-3">
           <form action={togglePollClosed.bind(null, poll.id)}>
-            <SubmitButton className="btn-secondary btn-sm">{poll.closed ? "Znovu otevřít" : "Uzavřít"}</SubmitButton>
+            <SubmitButton className="btn-secondary btn-sm">
+              {poll.closed ? <LockOpen className="h-3.5 w-3.5" /> : <Lock className="h-3.5 w-3.5" />}
+              {poll.closed ? "Otevřít" : "Uzavřít"}
+            </SubmitButton>
           </form>
           <form action={deletePoll.bind(null, poll.id)}>
             <SubmitButton className="btn-danger btn-sm" confirm="Opravdu smazat anketu?">
-              Smazat
+              <Trash2 className="h-3.5 w-3.5" /> Smazat
             </SubmitButton>
           </form>
         </div>

@@ -1,6 +1,18 @@
 import type { Event } from "@prisma/client";
 import { toLocalInput } from "@/lib/time";
+import { CalendarClock, Info, MapPin, Sparkles } from "lucide-react";
 import { SubmitButton } from "./SubmitButton";
+
+function FormSection({ title, icon: Icon, children }: { title: string; icon: React.ElementType; children: React.ReactNode }) {
+  return (
+    <section>
+      <h2 className="section-title">
+        <Icon className="h-4 w-4" /> {title}
+      </h2>
+      <div className="card grid gap-4 sm:grid-cols-2">{children}</div>
+    </section>
+  );
+}
 
 function Field({
   label,
@@ -34,7 +46,7 @@ function Field({
         placeholder={placeholder}
         className="input"
       />
-      {hint && <p className="mt-1 text-xs text-slate-500">{hint}</p>}
+      {hint && <p className="mt-1.5 text-xs text-ink-3">{hint}</p>}
     </div>
   );
 }
@@ -52,9 +64,8 @@ export function EventForm({
   showFee: boolean;
 }) {
   return (
-    <form action={action} className="space-y-5">
-      <section className="card space-y-4">
-        <h2 className="section-title">Základní informace</h2>
+    <form action={action} className="space-y-6">
+      <FormSection title="Základní informace" icon={Sparkles}>
         <Field label="Název akce" name="title" required defaultValue={event?.title} placeholder="Např. Letní festival" />
         <div>
           <label className="label" htmlFor="status">Stav</label>
@@ -64,10 +75,9 @@ export function EventForm({
             <option value="CANCELLED">Zrušeno</option>
           </select>
         </div>
-      </section>
+      </FormSection>
 
-      <section className="card grid gap-4 sm:grid-cols-2">
-        <h2 className="section-title sm:col-span-2">Místo</h2>
+      <FormSection title="Místo" icon={MapPin}>
         <Field label="Klub / místo konání" name="venueName" defaultValue={event?.venueName} />
         <Field label="Adresa" name="venueAddress" defaultValue={event?.venueAddress} placeholder="Ulice, město" />
         <Field
@@ -76,19 +86,17 @@ export function EventForm({
           defaultValue={event?.meetingPoint}
           placeholder="Např. zkušebna, Praha 7"
         />
-      </section>
+      </FormSection>
 
-      <section className="card grid gap-4 sm:grid-cols-2">
-        <h2 className="section-title sm:col-span-2">Harmonogram</h2>
+      <FormSection title="Harmonogram" icon={CalendarClock}>
         <Field label="Odjezd" name="departureAt" type="datetime-local" defaultValue={toLocalInput(event?.departureAt)} />
         <Field label="Příjezd / get-in" name="getInAt" type="datetime-local" defaultValue={toLocalInput(event?.getInAt)} />
         <Field label="Zvuková zkouška" name="soundcheckAt" type="datetime-local" defaultValue={toLocalInput(event?.soundcheckAt)} />
         <Field label="Začátek vystoupení" name="startAt" type="datetime-local" required defaultValue={toLocalInput(event?.startAt)} />
         <Field label="Konec" name="endAt" type="datetime-local" defaultValue={toLocalInput(event?.endAt)} hint="Když nevyplníte, počítá se 3 h od začátku." />
-      </section>
+      </FormSection>
 
-      <section className="card grid gap-4 sm:grid-cols-2">
-        <h2 className="section-title sm:col-span-2">Další informace</h2>
+      <FormSection title="Další informace" icon={Info}>
         <Field label="Kontaktní osoba" name="contactName" defaultValue={event?.contactName} />
         <Field label="Telefon na kontakt" name="contactPhone" type="tel" defaultValue={event?.contactPhone} />
         {showFee && (
@@ -103,10 +111,10 @@ export function EventForm({
           <label className="label" htmlFor="notes">Poznámky</label>
           <textarea id="notes" name="notes" rows={3} defaultValue={event?.notes ?? ""} className="input" />
         </div>
-      </section>
+      </FormSection>
 
-      <div className="sticky bottom-20 z-10 md:bottom-4">
-        <SubmitButton className="btn-primary w-full shadow-lg">{submitLabel}</SubmitButton>
+      <div className="sticky bottom-24 z-10 md:bottom-4">
+        <SubmitButton className="btn-primary w-full">{submitLabel}</SubmitButton>
       </div>
     </form>
   );

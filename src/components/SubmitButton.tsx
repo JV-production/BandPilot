@@ -1,6 +1,7 @@
 "use client";
 
 import { useFormStatus } from "react-dom";
+import { Loader2 } from "lucide-react";
 
 export function SubmitButton({
   children,
@@ -15,7 +16,9 @@ export function SubmitButton({
   name?: string;
   value?: string;
 }) {
-  const { pending } = useFormStatus();
+  const { pending, data } = useFormStatus();
+  // Při více tlačítkách v jednom formuláři točí jen to, které bylo stisknuto.
+  const mine = pending && (!name || data?.get(name) === value);
   return (
     <button
       type="submit"
@@ -27,7 +30,7 @@ export function SubmitButton({
         if (confirm && !window.confirm(confirm)) e.preventDefault();
       }}
     >
-      {pending ? "…" : children}
+      {mine ? <Loader2 className="h-4 w-4 animate-spin" /> : children}
     </button>
   );
 }

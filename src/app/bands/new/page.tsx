@@ -13,17 +13,17 @@ export default async function NewBandPage() {
       <form action={createBand} className="card space-y-4">
         <div>
           <label className="label" htmlFor="name">Název *</label>
-          <input id="name" name="name" required className="input" />
+          <input id="name" name="name" required className="input" placeholder="např. Rocková Smršť" />
         </div>
         <div>
           <label className="label" htmlFor="description">Popis</label>
           <textarea id="description" name="description" rows={3} className="input" />
         </div>
         <div>
-          <label className="label" htmlFor="color">Barva</label>
-          <input id="color" name="color" type="color" defaultValue="#6366f1" className="h-11 w-20 rounded-lg border border-slate-300" />
+          <label className="label" htmlFor="color">Barva kapely</label>
+          <input id="color" name="color" type="color" defaultValue="#E0680F" className="h-12 w-20 cursor-pointer rounded-xl border border-line bg-surface p-1" />
         </div>
-        <SubmitButton>Vytvořit kapelu</SubmitButton>
+        <SubmitButton className="btn-primary w-full">Vytvořit kapelu</SubmitButton>
       </form>
     </div>
   );

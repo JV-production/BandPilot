@@ -5,7 +5,8 @@ import { isAdmin } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
 import { fmt, fmtShortDate, TIMEZONE } from "@/lib/time";
 import { formatInTimeZone } from "date-fns-tz";
-import { BandDot, Empty, PageHeader, StatusBadge, personName } from "@/components/ui";
+import { CalendarClock, ChevronLeft, ChevronRight, History, Users } from "lucide-react";
+import { BandDot, Empty, PageHeader, SectionTitle, StatusBadge, personName } from "@/components/ui";
 
 export const metadata = { title: "Honoráře" };
 
@@ -16,20 +17,26 @@ function yearRange(year: number) {
 
 function SummaryTiles({ s }: { s: PaySummary }) {
   const tiles = [
-    { label: "Odehráno", value: s.played, sub: `${s.playedCount} akcí` },
     { label: "Vyplaceno", value: s.paid },
-    { label: "Zbývá doplatit", value: s.outstanding, highlight: s.outstanding > 0 },
+    { label: "Doplatit", value: s.outstanding, highlight: s.outstanding > 0 },
     { label: "Nadcházející", value: s.upcoming, sub: `${s.upcomingCount} akcí` },
   ];
   return (
-    <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-      {tiles.map((t) => (
-        <div key={t.label} className={`card ${t.highlight ? "border-amber-300 bg-amber-50" : ""}`}>
-          <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">{t.label}</div>
-          <div className="mt-1 text-xl font-extrabold">{formatCzk(t.value)}</div>
-          {t.sub && <div className="text-xs text-slate-500">{t.sub}</div>}
-        </div>
-      ))}
+    <div className="space-y-3">
+      <div className="rounded-3xl bg-gradient-to-br from-brand to-brand-2 p-5 text-white shadow-glow">
+        <div className="text-sm font-medium text-white/80">Odehráno</div>
+        <div className="font-display text-[2.6rem] font-black leading-tight">{formatCzk(s.played)}</div>
+        <div className="text-sm text-white/80">{s.playedCount} akcí</div>
+      </div>
+      <div className="grid grid-cols-3 gap-3">
+        {tiles.map((t) => (
+          <div key={t.label} className={`card p-3 sm:p-4 ${t.highlight ? "border-warn/40 bg-warn-soft" : ""}`}>
+            <div className="text-[11px] font-semibold uppercase tracking-wide text-ink-3">{t.label}</div>
+            <div className={`mt-1 font-display text-lg font-black leading-tight ${t.highlight ? "text-warn" : ""}`}>{formatCzk(t.value)}</div>
+            {t.sub && <div className="text-[11px] text-ink-3">{t.sub}</div>}
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -76,22 +83,22 @@ export default async function EarningsPage({ searchParams }: { searchParams: Pro
   const link = (y: number, u?: string) => `/earnings?year=${y}${u && u !== me.id ? `&user=${u}` : ""}`;
 
   const Row = ({ slot }: { slot: (typeof slots)[number] }) => (
-    <Link href={`/events/${slot.event.id}`} className="flex items-center justify-between gap-3 p-3 hover:bg-slate-50">
+    <Link href={`/events/${slot.event.id}`} className="list-row justify-between hover:bg-surface-2">
       <div className="min-w-0">
-        <div className="flex items-center gap-2 text-xs text-slate-500">
+        <div className="flex items-center gap-2 text-xs text-ink-3">
           <BandDot color={slot.event.band.color} /> {slot.event.band.name} · {fmtShortDate(slot.event.startAt)}
         </div>
-        <div className={`truncate font-semibold ${slot.event.status === "CANCELLED" ? "line-through text-slate-400" : ""}`}>
+        <div className={`truncate font-semibold ${slot.event.status === "CANCELLED" ? "line-through text-ink-3" : ""}`}>
           {slot.event.title}
         </div>
-        <div className="text-xs text-slate-500">{slot.instrument}</div>
+        <div className="text-xs text-ink-3">{slot.instrument}</div>
       </div>
       <div className="shrink-0 text-right">
-        <div className="font-bold">{slot.event.status === "CANCELLED" ? "—" : formatCzk(slot.pay)}</div>
+        <div className="font-display font-black">{slot.event.status === "CANCELLED" ? "—" : formatCzk(slot.pay)}</div>
         {slot.event.status === "CANCELLED" ? (
           <StatusBadge status="CANCELLED" />
         ) : slot.event.startAt < now ? (
-          <span className={`badge ${slot.paidAt ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"}`}>
+          <span className={`badge ${slot.paidAt ? "bg-ok-soft text-ok" : "bg-warn-soft text-warn"}`}>
             {slot.paidAt ? `vyplaceno ${fmt(slot.paidAt, "d. M.")}` : "čeká na výplatu"}
           </span>
         ) : null}
@@ -103,49 +110,53 @@ export default async function EarningsPage({ searchParams }: { searchParams: Pro
     <div className="space-y-6">
       <PageHeader
         title={target.id === me.id ? "Moje honoráře" : `Honoráře – ${personName(target)}`}
-        subtitle="🔒 Tyto částky vidíš jen ty a organizátor."
+        subtitle="Tyto částky vidíš jen ty a organizátor."
         back={target.id !== me.id ? { href: link(year), label: "Moje honoráře" } : undefined}
         actions={
-          <div className="flex items-center gap-1">
-            <Link href={link(year - 1, target.id)} className="btn-secondary btn-sm" aria-label="Předchozí rok">‹</Link>
-            <span className="px-2 font-bold">{year}</span>
-            <Link href={link(year + 1, target.id)} className="btn-secondary btn-sm" aria-label="Další rok">›</Link>
+          <div className="flex items-center gap-1 rounded-full bg-surface-2 p-1">
+            <Link href={link(year - 1, target.id)} className="btn-icon min-h-[32px] w-8 bg-surface" aria-label="Předchozí rok">
+              <ChevronLeft className="h-4 w-4" />
+            </Link>
+            <span className="px-2 font-display font-black tabular-nums">{year}</span>
+            <Link href={link(year + 1, target.id)} className="btn-icon min-h-[32px] w-8 bg-surface" aria-label="Další rok">
+              <ChevronRight className="h-4 w-4" />
+            </Link>
           </div>
         }
       />
 
       <SummaryTiles s={summary} />
       {summary.unsetCount > 0 && (
-        <p className="text-xs text-slate-500">U {summary.unsetCount} akcí zatím není honorář určen (počítá se jako 0 Kč).</p>
+        <p className="text-xs text-ink-3">U {summary.unsetCount} akcí zatím není honorář určen (počítá se jako 0 Kč).</p>
       )}
 
       <section>
-        <h2 className="section-title">Nadcházející</h2>
+        <SectionTitle icon={CalendarClock}>Nadcházející</SectionTitle>
         {upcoming.length === 0 ? (
           <Empty>Žádné nadcházející akce v sestavě.</Empty>
         ) : (
-          <div className="card divide-y divide-slate-100 p-0 sm:p-0">{upcoming.map((s) => <Row key={s.id} slot={s} />)}</div>
+          <div className="list">{upcoming.map((s) => <Row key={s.id} slot={s} />)}</div>
         )}
       </section>
 
       <section>
-        <h2 className="section-title">Odehráno</h2>
+        <SectionTitle icon={History}>Odehráno</SectionTitle>
         {played.length === 0 ? (
           <Empty>V roce {year} zatím nic odehráno.</Empty>
         ) : (
-          <div className="card divide-y divide-slate-100 p-0 sm:p-0">{played.map((s) => <Row key={s.id} slot={s} />)}</div>
+          <div className="list">{played.map((s) => <Row key={s.id} slot={s} />)}</div>
         )}
       </section>
 
       {admin && (
         <section>
-          <h2 className="section-title">Přehled všech hráčů ({year}) 🔒</h2>
+          <SectionTitle icon={Users}>Všichni hráči · {year}</SectionTitle>
           {players.length === 0 ? (
             <Empty>Žádná data.</Empty>
           ) : (
-            <div className="card overflow-x-auto p-0 sm:p-0">
+            <div className="list overflow-x-auto">
               <table className="w-full text-sm">
-                <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500">
+                <thead className="bg-surface-2 text-left text-[11px] uppercase tracking-wide text-ink-3">
                   <tr>
                     <th className="p-3">Hráč</th>
                     <th className="p-3 text-right">Odehráno</th>
@@ -153,14 +164,14 @@ export default async function EarningsPage({ searchParams }: { searchParams: Pro
                     <th className="p-3 text-right">Nadcház.</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100">
+                <tbody className="divide-y divide-line/70">
                   {players.map((p) => (
                     <tr key={p.id}>
                       <td className="p-3">
-                        <Link href={link(year, p.id)} className="font-semibold text-brand-700">{p.name}</Link>
+                        <Link href={link(year, p.id)} className="link">{p.name}</Link>
                       </td>
                       <td className="whitespace-nowrap p-3 text-right">{formatCzk(p.s.played)}</td>
-                      <td className={`whitespace-nowrap p-3 text-right ${p.s.outstanding > 0 ? "font-bold text-amber-700" : ""}`}>
+                      <td className={`whitespace-nowrap p-3 text-right ${p.s.outstanding > 0 ? "font-bold text-warn" : ""}`}>
                         {formatCzk(p.s.outstanding)}
                       </td>
                       <td className="whitespace-nowrap p-3 text-right">{formatCzk(p.s.upcoming)}</td>

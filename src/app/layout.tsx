@@ -1,4 +1,6 @@
 import type { Metadata, Viewport } from "next";
+import "@fontsource/nunito/800.css";
+import "@fontsource/nunito/900.css";
 import "./globals.css";
 import { getCurrentUser } from "@/lib/auth";
 import { AppShell } from "@/components/AppShell";
@@ -17,7 +19,10 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#4f46e5",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#f6f6fb" },
+    { media: "(prefers-color-scheme: dark)", color: "#09090f" },
+  ],
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",

@@ -1,13 +1,13 @@
 export const EVENT_STATUS: Record<string, { label: string; className: string }> = {
-  PLANNED: { label: "V jednání", className: "bg-amber-100 text-amber-800" },
-  CONFIRMED: { label: "Potvrzeno", className: "bg-emerald-100 text-emerald-800" },
-  CANCELLED: { label: "Zrušeno", className: "bg-rose-100 text-rose-800" },
+  PLANNED: { label: "V jednání", className: "bg-warn-soft text-warn" },
+  CONFIRMED: { label: "Potvrzeno", className: "bg-ok-soft text-ok" },
+  CANCELLED: { label: "Zrušeno", className: "bg-bad-soft text-bad" },
 };
 
 export const ATTENDANCE: Record<string, { label: string; className: string }> = {
-  YES: { label: "Hraju", className: "bg-emerald-100 text-emerald-800" },
-  MAYBE: { label: "Možná", className: "bg-amber-100 text-amber-800" },
-  NO: { label: "Nemůžu", className: "bg-rose-100 text-rose-800" },
+  YES: { label: "Hraju", className: "bg-ok-soft text-ok" },
+  MAYBE: { label: "Možná", className: "bg-warn-soft text-warn" },
+  NO: { label: "Nemůžu", className: "bg-bad-soft text-bad" },
 };
 
 export const BAND_ROLE: Record<string, string> = {
