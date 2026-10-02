@@ -13,6 +13,7 @@ function inDays(days: number, time: string) {
 }
 
 async function main() {
+  if (process.env.VERCEL_ENV === "production") throw new Error("Testovací data se do ostré verze nenahrávají.");
   const adminEmail = (process.env.ADMIN_EMAILS || "organizator@example.com").split(",")[0].trim().toLowerCase();
   const admin = await prisma.user.upsert({
     where: { email: adminEmail },

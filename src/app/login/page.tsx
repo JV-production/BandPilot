@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { CalendarCheck, Car, Users } from "lucide-react";
+import { loginLocked } from "@/lib/access";
 import { devLoginEnabled, getCurrentUser } from "@/lib/auth";
 import { Logo } from "@/components/Logo";
 import { LoginButtons } from "./LoginButtons";
@@ -13,8 +14,10 @@ const FEATURES = [
   { icon: Car, text: "Doprava – kdo s kým jede" },
 ];
 
-export default async function LoginPage() {
+export default async function LoginPage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
   if (await getCurrentUser()) redirect("/");
+  const { error } = await searchParams;
+  const locked = loginLocked();
   const googleEnabled = !!(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET);
   return (
     <div className="safe-top relative flex min-h-screen items-center justify-center overflow-hidden bg-[#0b0b0d] px-5 text-white">
@@ -41,6 +44,13 @@ export default async function LoginPage() {
             </li>
           ))}
         </ul>
+        {(error === "AccessDenied" || locked) && (
+          <p className="mb-4 rounded-2xl border border-white/10 bg-white/[0.06] p-3 text-center text-sm text-amber-300">
+            {locked
+              ? "Aplikace je dočasně uzavřená – přihlásit se může jen organizátor."
+              : "Tento účet nemá přístup. Požádejte organizátora, aby vás přidal do kapely."}
+          </p>
+        )}
         <LoginButtons googleEnabled={googleEnabled} devEnabled={devLoginEnabled} />
         <p className="mt-6 text-center text-xs leading-relaxed text-white/45">
           Přístup do kapel vám přidělí organizátor.{" "}
