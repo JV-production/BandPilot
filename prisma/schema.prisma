@@ -1,13 +1,15 @@
-// BandPilot – datový model
-// Pro produkci lze provider změnit na "postgresql" (schéma nepoužívá nic specifického pro SQLite).
+// BandPilot – datový model (PostgreSQL)
 
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "sqlite"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  // Připojení přes pooler (Neon nastaví automaticky)
+  url       = env("DATABASE_URL")
+  // Přímé připojení pro úpravy schématu (Neon nastaví automaticky jako DATABASE_URL_UNPOOLED)
+  directUrl = env("DATABASE_URL_UNPOOLED")
 }
 
 // ---------- Uživatelé a přihlášení (NextAuth) ----------

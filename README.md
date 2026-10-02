@@ -33,15 +33,15 @@ hlasování a automatický zápis do Google Kalendáře. Běží v prohlížeči
 
 ## Technologie
 
-Next.js 15 (App Router, server actions) · React 19 · TypeScript · Tailwind CSS · Prisma (SQLite pro vývoj,
-PostgreSQL pro produkci) · NextAuth (přihlášení přes Google) · Google Calendar API · PWA (manifest + service worker).
+Next.js 15 (App Router, server actions) · React 19 · TypeScript · Tailwind CSS · Prisma + PostgreSQL · NextAuth (přihlášení přes Google) · Google Calendar API · PWA (manifest + service worker).
 
 ## Spuštění lokálně
 
 ```bash
+# potřebujete běžící PostgreSQL (lokálně nebo zdarma na neon.tech)
 npm install
 cp .env.example .env          # a vyplňte hodnoty (viz níže)
-npm run db:push               # vytvoří databázi
+npm run db:push               # vytvoří tabulky v databázi
 npm run db:seed               # (volitelné) ukázková data
 npm run dev                   # http://localhost:3000
 ```
@@ -71,12 +71,17 @@ Testy a kontroly: `npm test`, `npm run typecheck`, `npm run lint`.
 
 ## Nasazení na web
 
-Doporučené: **Vercel** + **PostgreSQL** (Neon, Supabase, Vercel Postgres…).
+Doporučené: **Vercel** + databáze **Neon** (obojí zdarma).
 
-1. V `prisma/schema.prisma` změňte `provider = "sqlite"` na `provider = "postgresql"`.
-2. Na Vercelu nastavte proměnné z `.env.example` (`DATABASE_URL`, `NEXTAUTH_URL` = veřejná adresa,
-   `NEXTAUTH_SECRET` = `openssl rand -base64 32`, Google klíče, `ADMIN_EMAILS`, `APP_TIMEZONE`).
-3. Po prvním nasazení spusťte `npx prisma db push` proti produkční databázi.
+1. Na vercel.com se přihlaste přes GitHub → *Add New → Project* → importujte tento repozitář.
+2. V projektu *Storage → Create Database → Neon* – Vercel sám nastaví `DATABASE_URL` a `DATABASE_URL_UNPOOLED`.
+3. *Settings → Environment Variables*: `NEXTAUTH_URL` (veřejná adresa, např. `https://bandpilot.cz`),
+   `NEXTAUTH_SECRET` (náhodný řetězec, např. `openssl rand -base64 32`), `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`,
+   `ADMIN_EMAILS`, `APP_TIMEZONE=Europe/Prague`, volitelně `CONTACT_EMAIL`.
+4. *Deployments → Redeploy*. Tabulky v databázi se vytvoří automaticky při každém sestavení (`prisma db push`).
+5. *Settings → Domains* → přidejte vlastní doménu a u registrátora nastavte DNS záznamy, které Vercel ukáže.
+6. V Google Cloud doplňte redirect URI `https://VASE-DOMENA/api/auth/callback/google` a v *Branding* domovskou
+   stránku, odkaz na `https://VASE-DOMENA/privacy` a autorizovanou doménu.
 
 Aplikace musí běžet na **HTTPS** – jinak nejde nainstalovat do telefonu a Google přihlášení nefunguje.
 

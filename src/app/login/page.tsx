@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { devLoginEnabled, getCurrentUser } from "@/lib/auth";
 import { LoginButtons } from "./LoginButtons";
@@ -20,6 +21,9 @@ export default async function LoginPage() {
           Přihlášením přes Google povolíte zápis koncertů do svého Google Kalendáře.
           Přístup do kapel vám přidělí organizátor.
         </p>
+        <Link href="/privacy" className="mt-3 inline-block text-xs text-brand-600 underline">
+          Zásady ochrany osobních údajů
+        </Link>
       </div>
     </div>
   );
