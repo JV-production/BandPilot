@@ -217,11 +217,12 @@ export default async function BandPage({ params }: { params: Promise<{ id: strin
                     <CalendarSync className="h-5 w-5" />
                   </span>
                   <div className="min-w-0 text-sm">
-                    <div className="font-semibold">Koncerty se načítají z kalendáře</div>
+                    <div className="font-semibold">Koncerty se načítají z Google Kalendáře</div>
                     <div className="truncate text-ink-2">{band.importCalendarId}</div>
                     <div className="text-xs text-ink-3">
                       {importedCount} importovaných akcí
                       {band.importedAt && ` · naposledy ${fmtDateTime(band.importedAt)}`}
+                      {band.watchExpiresAt && band.watchExpiresAt > new Date() && " · změny se načítají okamžitě"}
                     </div>
                   </div>
                 </div>
@@ -243,15 +244,16 @@ export default async function BandPage({ params }: { params: Promise<{ id: strin
                   </form>
                 </div>
                 <p className="text-xs text-ink-3">
-                  Aktualizuje se automaticky (při otevření aplikace nejvýš každých 30 minut a jednou denně). Z kalendáře se
-                  přebírá název, čas a místo; odjezd, zvukovku, sestavu a další údaje doplňujete v aplikaci a zůstanou zachované.
+                  Jednosměrně: kalendář → aplikace. Aplikace v kalendáři nic nemění. Změny v kalendáři se načítají automaticky
+                  (Google je hlásí okamžitě; pojistně i při otevření aplikace a jednou denně). Z kalendáře se přebírá název,
+                  čas a místo; odjezd, zvukovku, sestavu a další údaje doplňujete v aplikaci a zůstanou zachované.
                 </p>
               </>
             ) : (
               <form action={setBandImport.bind(null, id)} className="space-y-3">
                 <p className="text-sm text-ink-2">
                   Máte koncerty této kapely v Google Kalendáři? Zadejte jeho ID a aplikace z něj budoucí události sama načte
-                  a bude je průběžně aktualizovat.
+                  a bude je průběžně aktualizovat. Kalendář se jen čte – aplikace v něm nic nemění.
                 </p>
                 <div>
                   <label className="label">ID kalendáře</label>

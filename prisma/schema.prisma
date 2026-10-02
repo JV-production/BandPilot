@@ -92,6 +92,11 @@ model Band {
   importOwnerId    String?
   importedAt       DateTime?
   importError      String?
+  // Google push notifikace (okamžité načtení změn z kalendáře)
+  watchChannelId   String?
+  watchResourceId  String?
+  watchToken       String?
+  watchExpiresAt   DateTime?
 
   memberships BandMembership[]
   events      Event[]

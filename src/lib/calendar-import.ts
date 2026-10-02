@@ -1,6 +1,7 @@
 // Import koncertů z existujícího Google Kalendáře do kapely.
 import type { calendar_v3 } from "googleapis";
 import { fromZonedTime } from "date-fns-tz";
+import { ensureWatch, eventLocation } from "./band-calendar";
 import { calendarClientFor, syncEventToCalendars } from "./google-calendar";
 import { defaultLineup } from "./lineup";
 import { prisma } from "./prisma";
@@ -121,11 +122,12 @@ export async function importBandCalendar(bandId: string): Promise<ImportResult> 
     }
 
     // Kalendář je zdrojem pravdy pro název, čas a místo; ostatní (odjezd, zvukovka, sestava…) se nemění.
+    const locationChanged = eventLocation(existing) !== f.venueAddress;
     const changed =
+      locationChanged ||
       existing.title !== f.title ||
       existing.startAt.getTime() !== f.startAt.getTime() ||
-      (existing.endAt?.getTime() ?? null) !== (f.endAt?.getTime() ?? null) ||
-      existing.venueAddress !== f.venueAddress;
+      (existing.endAt?.getTime() ?? null) !== (f.endAt?.getTime() ?? null);
     if (changed) {
       await prisma.event.update({
         where: { id: existing.id },
@@ -133,9 +135,7 @@ export async function importBandCalendar(bandId: string): Promise<ImportResult> 
           title: f.title,
           startAt: f.startAt,
           endAt: f.endAt,
-          venueAddress: f.venueAddress,
-          ...(existing.venueName ? {} : { venueName: f.venueName }),
-          ...(existing.status === "CANCELLED" ? { status: "CONFIRMED" } : {}),
+          ...(locationChanged ? { venueAddress: f.venueAddress, venueName: f.venueName } : {}),
         },
       });
       result.updated++;
@@ -169,15 +169,14 @@ export function describeError(err: unknown): string {
 
 const AUTO_IMPORT_EVERY_MS = 30 * 60 * 1000;
 
-/** Spustí import u kapel, které ho mají nastavený a dlouho se neaktualizovaly. */
+/** U kapel s propojeným kalendářem: načte změny, pokud dlouho neproběhly, a udrží aktivní push notifikace. */
 export async function autoImportStale(bandIds?: string[]) {
   const bands = await prisma.band.findMany({
-    where: {
-      importCalendarId: { not: null },
-      ...(bandIds ? { id: { in: bandIds } } : {}),
-      OR: [{ importedAt: null }, { importedAt: { lt: new Date(Date.now() - AUTO_IMPORT_EVERY_MS) } }],
-    },
-    select: { id: true },
+    where: { importCalendarId: { not: null }, ...(bandIds ? { id: { in: bandIds } } : {}) },
+    select: { id: true, importedAt: true },
   });
-  for (const b of bands) await importBandCalendarSafe(b.id);
+  for (const b of bands) {
+    if (!b.importedAt || Date.now() - b.importedAt.getTime() > AUTO_IMPORT_EVERY_MS) await importBandCalendarSafe(b.id);
+    await ensureWatch(b.id);
+  }
 }

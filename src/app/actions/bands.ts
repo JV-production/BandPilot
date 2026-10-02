@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import { requireAdmin } from "@/lib/auth";
 import { oneOf, requiredStr, str } from "@/lib/form";
 import { parsePay } from "@/lib/earnings";
+import { ensureWatch, stopWatch } from "@/lib/band-calendar";
 import { importBandCalendarSafe } from "@/lib/calendar-import";
 import { hasGoogleCalendar, syncUpcomingForUser } from "@/lib/google-calendar";
 import { prisma } from "@/lib/prisma";
@@ -107,24 +108,27 @@ export async function setBandImport(bandId: string, formData: FormData) {
   if (!(await hasGoogleCalendar(admin.id))) {
     throw new Error("Váš účet nemá propojený Google Kalendář. Odhlaste se a přihlaste znovu přes Google (povolte kalendář).");
   }
+  await stopWatch(bandId);
   await prisma.band.update({
     where: { id: bandId },
     data: { importCalendarId: calendarId, importOwnerId: admin.id, importError: null },
   });
-  await importBandCalendarSafe(bandId);
+  // Načíst koncerty z kalendáře a zapnout okamžité notifikace o změnách (kalendář se nijak nemění).
+  if (await importBandCalendarSafe(bandId)) await ensureWatch(bandId);
   revalidatePath(`/bands/${bandId}`);
   revalidatePath("/");
 }
 
 export async function runBandImport(bandId: string) {
   await requireAdmin();
-  await importBandCalendarSafe(bandId);
+  if (await importBandCalendarSafe(bandId)) await ensureWatch(bandId);
   revalidatePath(`/bands/${bandId}`);
   revalidatePath("/");
 }
 
 export async function clearBandImport(bandId: string) {
   await requireAdmin();
+  await stopWatch(bandId);
   // Už importované koncerty zůstávají – jen se přestanou aktualizovat.
   await prisma.band.update({
     where: { id: bandId },
